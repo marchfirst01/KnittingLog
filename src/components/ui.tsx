@@ -79,7 +79,7 @@ export function Segmented<T extends string>({
   value,
   onChange,
 }: {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; badge?: number }[];
   value: T;
   onChange: (v: T) => void;
 }) {
@@ -90,6 +90,11 @@ export function Segmented<T extends string>({
         return (
           <Pressable key={o.value} onPress={() => onChange(o.value)} style={[styles.segmentItem, on && styles.segmentOn]}>
             <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{o.label}</Text>
+            {!!o.badge && (
+              <View style={styles.chipBadge}>
+                <Text style={styles.chipBadgeText}>{o.badge}</Text>
+              </View>
+            )}
           </Pressable>
         );
       })}
@@ -207,15 +212,17 @@ export function IconButton({
   color = colors.text,
   size = 22,
   style,
+  accessibilityLabel,
 }: {
   name: keyof typeof Ionicons.glyphMap;
   onPress?: () => void;
   color?: string;
   size?: number;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 }) {
   return (
-    <Pressable onPress={onPress} hitSlop={10} style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.5 }, style]}>
+    <Pressable onPress={onPress} hitSlop={10} accessibilityLabel={accessibilityLabel} style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.5 }, style]}>
       <Ionicons name={name} size={size} color={color} />
     </Pressable>
   );
@@ -279,7 +286,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 4,
   },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
+  segmentItem: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10 },
   segmentOn: {
     backgroundColor: colors.surface,
     shadowColor: '#000',

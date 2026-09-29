@@ -21,7 +21,7 @@ export function TimerCard({
   const { state, actions } = useStore();
   const timer = state.timers[projectId];
   const running = !!timer?.runningSince;
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!running) return;

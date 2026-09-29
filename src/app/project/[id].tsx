@@ -1,17 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EditorMode, LogEditor } from '../../components/LogEditor';
 import { LogItem } from '../../components/LogItem';
+import { ProjectSettings } from '../../components/ProjectSettings';
 import { TimerCard } from '../../components/TimerCard';
 import { Avatar, Button, EmptyState, IconButton, Sheet, StatusBadge, monoText } from '../../components/ui';
 import { useStore } from '../../store/AppStore';
 import { colors, fonts, statusStyles } from '../../theme';
 import { ProjectStatus } from '../../types';
-import { duration } from '../../utils/format';
+import { hoursMinutes } from '../../utils/format';
 
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,7 +23,7 @@ export default function ProjectDetailScreen() {
   const [viewId, setViewId] = useState(isMember ? state.meId : project?.ownerId ?? state.meId);
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [statusSheet, setStatusSheet] = useState(false);
-  const [manageSheet, setManageSheet] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const logs = useMemo(
     () =>
@@ -45,9 +46,9 @@ export default function ProjectDetailScreen() {
   const viewingMe = viewId === state.meId;
   const isOwner = project.ownerId === state.meId;
   const isGroup = project.type === 'group';
-  const latestRows = logs.find((l) => l.rows != null)?.rows;
   const totalSec = logs.reduce((s, l) => s + l.durationSec, 0);
-  const applicants = project.recruit?.applicantIds ?? [];
+  const hasApplicants = isGroup && project.visibility === 'public' && project.applicantIds.length > 0;
+  const showSettings = isOwner || (isGroup && isMember);
 
   const saveLog = (input: Parameters<typeof actions.addLog>[1]) => {
     if (editor?.kind === 'edit') actions.updateLog(editor.log.id, input);
@@ -75,10 +76,14 @@ export default function ProjectDetailScreen() {
           </Text>
         </View>
         <StatusBadge status={project.status} onPress={isMember ? () => setStatusSheet(true) : undefined} />
-        {isGroup && isOwner && (
+        {showSettings && (
           <View style={{ marginLeft: 8 }}>
-            <IconButton name="people-outline" onPress={() => setManageSheet(true)} />
-            {applicants.length > 0 && <View style={styles.manageDot} pointerEvents="none" />}
+            <IconButton
+              name={isOwner ? 'settings-outline' : 'people-outline'}
+              onPress={() => setSettingsOpen(true)}
+              accessibilityLabel="프로젝트 설정"
+            />
+            {isOwner && hasApplicants && <View style={styles.manageDot} pointerEvents="none" />}
           </View>
         )}
       </View>
@@ -106,12 +111,12 @@ export default function ProjectDetailScreen() {
               <Text style={styles.progressTitle}>{viewingMe ? '나' : viewing?.name}의 진행 현황</Text>
               <Text style={[monoText, { marginTop: 6 }]}>{project.yarn}</Text>
               <Text style={[monoText, { marginTop: 4 }]}>
-                기록 {logs.length}개 · 총 {duration(totalSec)}
+                기록 {logs.length}개{isGroup ? ` · ${project.visibility === 'public' ? '공개방' : '비공개방'}` : ''}
               </Text>
             </View>
-            <View style={styles.rowsBox}>
-              <Text style={styles.rowsNum}>{latestRows ?? '-'}</Text>
-              <Text style={styles.rowsUnit}>단</Text>
+            <View style={styles.timeBox}>
+              <Text style={styles.timeNum}>{hoursMinutes(totalSec)}</Text>
+              <Text style={styles.timeUnit}>누적 시간</Text>
             </View>
           </View>
         </View>
@@ -151,7 +156,15 @@ export default function ProjectDetailScreen() {
         </View>
       </ScrollView>
 
-      <LogEditor mode={editor} onClose={() => setEditor(null)} onSave={saveLog} onSkip={skipLog} />
+      {editor && (
+        <LogEditor
+          key={editor.kind === 'edit' ? editor.log.id : editor.kind}
+          mode={editor}
+          onClose={() => setEditor(null)}
+          onSave={saveLog}
+          onSkip={skipLog}
+        />
+      )}
 
       {/* 상태 변경 */}
       <Sheet visible={statusSheet} onClose={() => setStatusSheet(false)} title="프로젝트 상태">
@@ -171,56 +184,7 @@ export default function ProjectDetailScreen() {
         ))}
       </Sheet>
 
-      {/* 함뜨 멤버/모집 관리 (방장) */}
-      <Sheet visible={manageSheet} onClose={() => setManageSheet(false)} title="함뜨 관리">
-        <ScrollView style={{ maxHeight: 460 }}>
-          <Text style={styles.sheetLabel}>
-            멤버 {project.memberIds.length}
-            {project.recruit ? `/${project.recruit.maxMembers}` : ''}명
-          </Text>
-          {project.memberIds.map((mid) => (
-            <View key={mid} style={styles.personRow}>
-              <Avatar user={state.users[mid]} size={34} />
-              <Text style={styles.personName}>
-                {state.users[mid]?.name}
-                {mid === project.ownerId && <Text style={styles.meTag}> 방장</Text>}
-              </Text>
-            </View>
-          ))}
-
-          {project.recruit && (
-            <>
-              <View style={[styles.personRow, { marginTop: 12 }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.personName}>공개 모집</Text>
-                  <Text style={{ fontSize: 12, color: colors.textSub, marginTop: 2 }}>
-                    켜 두면 '모집 중' 목록에 노출돼요.
-                  </Text>
-                </View>
-                <Switch
-                  value={project.recruit.isOpen}
-                  onValueChange={(v) => actions.setRecruitOpen(project.id, v)}
-                  trackColor={{ true: colors.primary, false: colors.borderStrong }}
-                />
-              </View>
-
-              <Text style={[styles.sheetLabel, { marginTop: 16 }]}>참여 신청 {applicants.length}</Text>
-              {applicants.length === 0 && <Text style={{ color: colors.textMuted, fontSize: 13 }}>새 신청이 없어요.</Text>}
-              {applicants.map((uidv) => (
-                <View key={uidv} style={styles.personRow}>
-                  <Avatar user={state.users[uidv]} size={34} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.personName}>{state.users[uidv]?.name}</Text>
-                    <Text style={[monoText, { fontSize: 12 }]}>@{state.users[uidv]?.handle}</Text>
-                  </View>
-                  <Button small title="거절" variant="outline" onPress={() => actions.rejectApplicant(project.id, uidv)} />
-                  <Button small title="수락" onPress={() => actions.acceptApplicant(project.id, uidv)} />
-                </View>
-              ))}
-            </>
-          )}
-        </ScrollView>
-      </Sheet>
+      <ProjectSettings project={project} visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </KeyboardAvoidingView>
   );
 }
@@ -267,9 +231,10 @@ const styles = StyleSheet.create({
   meTag: { fontSize: 12, color: colors.textSub, fontWeight: '600' },
   progressRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
   progressTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  rowsBox: {
-    width: 76,
+  timeBox: {
+    minWidth: 84,
     height: 76,
+    paddingHorizontal: 10,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: colors.primaryMuted,
@@ -277,8 +242,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowsNum: { fontFamily: fonts.mono, fontSize: 22, fontWeight: '700', color: colors.primary },
-  rowsUnit: { fontSize: 11, color: colors.primary, marginTop: 2 },
+  timeNum: { fontFamily: fonts.mono, fontSize: 22, fontWeight: '700', color: colors.primary },
+  timeUnit: { fontSize: 11, color: colors.primary, marginTop: 2 },
   content: { paddingHorizontal: 20, paddingTop: 22 },
   notice: {
     flexDirection: 'row',
@@ -299,7 +264,4 @@ const styles = StyleSheet.create({
   },
   optionDot: { width: 10, height: 10, borderRadius: 5 },
   optionText: { flex: 1, fontSize: 16, color: colors.text },
-  sheetLabel: { fontSize: 13, fontWeight: '700', color: colors.textSub, marginBottom: 8 },
-  personRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  personName: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text },
 });

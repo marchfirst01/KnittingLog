@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { LogInput } from '../store/AppStore';
 import { colors, fonts } from '../theme';
 import { KnitLog } from '../types';
 import { clockTime, duration, fullDate, parseDateTime, toDateInput, toTimeInput } from '../utils/format';
 import { Button, Sheet } from './ui';
+import { showAlert } from '../utils/alert';
 
 export type EditorMode =
   | { kind: 'timer'; startedAt: number; durationSec: number }
@@ -28,34 +29,25 @@ export function LogEditor({
   onSave,
   onSkip,
 }: {
-  mode: EditorMode | null;
+  mode: EditorMode;
   onClose: () => void;
   onSave: (input: LogInput) => void;
   /** timer 모드에서 '기록 안 함' */
   onSkip?: () => void;
 }) {
-  const [text, setText] = useState('');
-  const [rows, setRows] = useState('');
-  const [photoUri, setPhotoUri] = useState<string | undefined>();
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [minutes, setMinutes] = useState('');
-
-  useEffect(() => {
-    if (!mode) return;
-    const base =
-      mode.kind === 'edit' ? mode.log : mode.kind === 'timer' ? { startedAt: new Date(mode.startedAt).toISOString() } : null;
-    const start = base ? new Date(base.startedAt) : new Date(Date.now() - 3600 * 1000);
-    setDate(toDateInput(start));
-    setTime(toTimeInput(start));
-    setMinutes(mode.kind === 'edit' ? String(Math.round(mode.log.durationSec / 60)) : '60');
-    setText(mode.kind === 'edit' ? mode.log.text : '');
-    setRows(mode.kind === 'edit' && mode.log.rows != null ? String(mode.log.rows) : '');
-    setPhotoUri(mode.kind === 'edit' ? mode.log.photoUri : undefined);
-  }, [mode]);
-
-  if (!mode) return null;
-  const editableTime = mode.kind !== 'timer';
+  // 열릴 때마다 새로 마운트되므로(부모에서 key 지정) 초기값을 props에서 바로 계산한다
+  const [start] = useState(() =>
+    mode.kind === 'edit'
+      ? new Date(mode.log.startedAt)
+      : mode.kind === 'timer'
+        ? new Date(mode.startedAt)
+        : new Date(Date.now() - 3600 * 1000),
+  );
+  const [text, setText] = useState(mode.kind === 'edit' ? mode.log.text : '');
+  const [photoUri, setPhotoUri] = useState(mode.kind === 'edit' ? mode.log.photoUri : undefined);
+  const [date, setDate] = useState(toDateInput(start));
+  const [time, setTime] = useState(toTimeInput(start));
+  const [minutes, setMinutes] = useState(mode.kind === 'edit' ? String(Math.round(mode.log.durationSec / 60)) : '60');
 
   const pickPhoto = async (source: 'library' | 'camera') => {
     const perm =
@@ -63,7 +55,7 @@ export function LogEditor({
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('권한 필요', source === 'camera' ? '카메라 권한을 허용해 주세요.' : '사진 접근 권한을 허용해 주세요.');
+      showAlert('권한 필요', source === 'camera' ? '카메라 권한을 허용해 주세요.' : '사진 접근 권한을 허용해 주세요.');
       return;
     }
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7, allowsEditing: true, aspect: [1, 1] };
@@ -73,7 +65,7 @@ export function LogEditor({
   };
 
   const choosePhoto = () =>
-    Alert.alert('사진 추가', undefined, [
+    showAlert('사진 추가', undefined, [
       { text: '앨범에서 선택', onPress: () => pickPhoto('library') },
       { text: '사진 찍기', onPress: () => pickPhoto('camera') },
       { text: '취소', style: 'cancel' },
@@ -88,26 +80,24 @@ export function LogEditor({
     } else {
       const d = parseDateTime(date, time);
       if (!d) {
-        Alert.alert('날짜/시간 확인', '날짜는 2026-09-15, 시간은 21:00 형식으로 입력해 주세요.');
+        showAlert('날짜/시간 확인', '날짜는 2026-09-15, 시간은 21:00 형식으로 입력해 주세요.');
         return;
       }
       const m = Number(minutes);
       if (!Number.isFinite(m) || m < 0) {
-        Alert.alert('소요 시간 확인', '뜬 시간을 분 단위 숫자로 입력해 주세요.');
+        showAlert('소요 시간 확인', '뜬 시간을 분 단위 숫자로 입력해 주세요.');
         return;
       }
       startedAt = d.toISOString();
       durationSec = Math.round(m * 60);
     }
     if (!text.trim() && !photoUri) {
-      Alert.alert('내용을 입력해 주세요', '글이나 사진 중 하나는 남겨야 해요.');
+      showAlert('내용을 입력해 주세요', '글이나 사진 중 하나는 남겨야 해요.');
       return;
     }
-    const r = rows.trim() ? Number(rows) : undefined;
     onSave({
       startedAt,
       durationSec,
-      rows: r != null && Number.isFinite(r) ? r : undefined,
       text: text.trim(),
       photoUri,
     });
@@ -133,10 +123,6 @@ export function LogEditor({
             <Field label="뜬 시간(분)" value={minutes} onChangeText={setMinutes} placeholder="60" numeric flex={1} />
           </View>
         )}
-
-        <View style={styles.row}>
-          <Field label="현재 단수 (선택)" value={rows} onChangeText={setRows} placeholder="예: 42" numeric flex={1} />
-        </View>
 
         <Text style={styles.label}>오늘의 기록</Text>
         <TextInput

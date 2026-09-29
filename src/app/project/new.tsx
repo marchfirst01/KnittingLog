@@ -3,14 +3,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -20,7 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Button, IconButton, Segmented, SectionLabel } from '../../components/ui';
 import { useStore } from '../../store/AppStore';
 import { colors, fonts } from '../../theme';
-import { ProjectStatus, ProjectType } from '../../types';
+import { ProjectStatus, ProjectType, Visibility } from '../../types';
+import { showAlert } from '../../utils/alert';
 
 export default function NewProjectScreen() {
   const insets = useSafeAreaInsets();
@@ -31,7 +30,7 @@ export default function NewProjectScreen() {
   const [type, setType] = useState<ProjectType>('solo');
   const [status, setStatus] = useState<ProjectStatus>('ready');
   const [invited, setInvited] = useState<string[]>([]);
-  const [isPublic, setIsPublic] = useState(false);
+  const [visibility, setVisibility] = useState<Visibility>('private');
   const [maxMembers, setMaxMembers] = useState(4);
   const [description, setDescription] = useState('');
   const [coverUri, setCoverUri] = useState<string>();
@@ -41,14 +40,15 @@ export default function NewProjectScreen() {
 
   const pickCover = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return Alert.alert('권한 필요', '사진 접근 권한을 허용해 주세요.');
+    if (!perm.granted) return showAlert('권한 필요', '사진 접근 권한을 허용해 주세요.');
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, allowsEditing: true, aspect: [1, 1] });
     if (!res.canceled && res.assets[0]) setCoverUri(res.assets[0].uri);
   };
 
   const minMembers = 1 + invited.length;
+  const isPublic = visibility === 'public';
   const create = () => {
-    if (!title.trim()) return Alert.alert('프로젝트 이름을 입력해 주세요');
+    if (!title.trim()) return showAlert('프로젝트 이름을 입력해 주세요');
     const id = actions.createProject({
       title: title.trim(),
       yarn: yarn.trim() || '실 미정',
@@ -56,11 +56,10 @@ export default function NewProjectScreen() {
       status,
       type,
       coverUri,
-      memberIds: type === 'group' ? invited : [],
-      recruit:
-        type === 'group' && isPublic
-          ? { maxMembers: Math.max(maxMembers, minMembers + 1), description: description.trim() }
-          : undefined,
+      inviteIds: invited,
+      visibility,
+      maxMembers: Math.max(maxMembers, minMembers + 1),
+      description: description.trim(),
     });
     router.replace(`/project/${id}`);
   };
@@ -112,7 +111,7 @@ export default function NewProjectScreen() {
 
         {type === 'group' && (
           <View style={styles.groupBox}>
-            <SectionLabel>친구 초대</SectionLabel>
+            <SectionLabel>친구 초대 (선택)</SectionLabel>
             {state.friendIds.length === 0 && <Text style={styles.muted}>아직 친구가 없어요. 공개 모집으로 함께할 사람을 찾아보세요.</Text>}
             <View style={styles.friends}>
               {state.friendIds.map((fid) => {
@@ -127,37 +126,46 @@ export default function NewProjectScreen() {
               })}
             </View>
 
-            <View style={styles.switchRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.switchTitle}>공개 모집</Text>
-                <Text style={styles.muted}>다른 뜨개인들이 '모집 중' 목록에서 보고 참여 신청할 수 있어요.</Text>
-              </View>
-              <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ true: colors.primary, false: colors.borderStrong }} />
-            </View>
+            <View style={{ height: 18 }} />
+            <SectionLabel>공개 범위</SectionLabel>
+            <Segmented<Visibility>
+              value={visibility}
+              onChange={setVisibility}
+              options={[
+                { value: 'private', label: '비공개방' },
+                { value: 'public', label: '공개방' },
+              ]}
+            />
+            <Text style={[styles.muted, { marginTop: 8, marginBottom: 16 }]}>
+              {isPublic
+                ? "'모집 중' 목록에 보이고, 참여 신청을 받아 수락할 수 있어요."
+                : '목록에 보이지 않아요. 만들면 생기는 참여 코드나 친구 초대로만 들어올 수 있어요.'}
+            </Text>
 
+            <View style={styles.stepper}>
+              <Text style={styles.switchTitle}>최대 인원</Text>
+              <View style={styles.stepperCtrl}>
+                <IconButton name="remove-circle-outline" color={colors.primary} onPress={() => setMaxMembers((n) => Math.max(minMembers + 1, n - 1))} />
+                <Text style={styles.stepperNum}>{Math.max(maxMembers, minMembers + 1)}명</Text>
+                <IconButton name="add-circle-outline" color={colors.primary} onPress={() => setMaxMembers((n) => Math.min(20, Math.max(n, minMembers + 1) + 1))} />
+              </View>
+            </View>
             {isPublic && (
-              <>
-                <View style={styles.stepper}>
-                  <Text style={styles.switchTitle}>최대 인원</Text>
-                  <View style={styles.stepperCtrl}>
-                    <IconButton name="remove-circle-outline" color={colors.primary} onPress={() => setMaxMembers((n) => Math.max(minMembers + 1, n - 1))} />
-                    <Text style={styles.stepperNum}>{Math.max(maxMembers, minMembers + 1)}명</Text>
-                    <IconButton name="add-circle-outline" color={colors.primary} onPress={() => setMaxMembers((n) => Math.min(20, Math.max(n, minMembers + 1) + 1))} />
-                  </View>
-                </View>
-                <Input
-                  label="모집 소개"
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="예: 10월 첫째 주 시작해요. 초보도 환영!"
-                  multiline
-                />
-              </>
+              <Input
+                label="모집 소개"
+                value={description}
+                onChangeText={setDescription}
+                placeholder="예: 10월 첫째 주 시작해요. 초보도 환영!"
+                multiline
+              />
             )}
           </View>
         )}
 
-        <Button title="프로젝트 만들기" onPress={create} style={{ marginTop: 24 }} disabled={!title.trim()} />
+        <Text style={[styles.muted, { textAlign: 'center', marginTop: 20 }]}>
+          진행 방식과 공개 범위는 만든 뒤에도 프로젝트 설정에서 바꿀 수 있어요.
+        </Text>
+        <Button title="프로젝트 만들기" onPress={create} style={{ marginTop: 12 }} disabled={!title.trim()} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -243,7 +251,6 @@ const styles = StyleSheet.create({
   },
   friendOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   friendName: { fontSize: 14, fontWeight: '600', color: colors.text },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 12 },
   switchTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   muted: { fontSize: 12, lineHeight: 17, color: colors.textSub, marginTop: 2 },
   stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },

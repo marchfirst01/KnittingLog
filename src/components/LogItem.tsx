@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useStore } from '../store/AppStore';
 import { colors, fonts } from '../theme';
 import { KnitLog } from '../types';
 import { clockTime, duration, relative, shortDate } from '../utils/format';
 import { Avatar, IconButton, Thumb } from './ui';
+import { showAlert } from '../utils/alert';
 
 export const EMOJIS = ['❤️', '👏', '🧶', '✨', '🔥', '😍'];
 
@@ -20,13 +21,13 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
   const [zoom, setZoom] = useState(false);
 
   const openMenu = () =>
-    Alert.alert('기록', undefined, [
+    showAlert('기록', undefined, [
       { text: '수정', onPress: onEdit },
       {
         text: '삭제',
         style: 'destructive',
         onPress: () =>
-          Alert.alert('기록 삭제', '이 기록을 삭제할까요? 되돌릴 수 없어요.', [
+          showAlert('기록 삭제', '이 기록을 삭제할까요? 되돌릴 수 없어요.', [
             { text: '취소', style: 'cancel' },
             { text: '삭제', style: 'destructive', onPress: () => actions.deleteLog(log.id) },
           ]),
@@ -51,7 +52,7 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
     <View style={styles.row}>
       <View style={styles.left}>
         <Pressable onPress={() => log.photoUri && setZoom(true)}>
-          <Thumb uri={log.photoUri} seed={log.id} size={88} label={log.rows != null ? `${log.rows}단` : undefined} />
+          <Thumb uri={log.photoUri} seed={log.id} size={88} />
         </Pressable>
         {!isLast && <View style={styles.line} />}
       </View>
@@ -91,7 +92,7 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
                   key={r.emoji}
                   onPress={() => actions.toggleReaction(log.id, r.emoji)}
                   onLongPress={() =>
-                    Alert.alert(r.emoji, r.userIds.map((id) => state.users[id]?.name ?? '알 수 없음').join(', '))
+                    showAlert(r.emoji, r.userIds.map((id) => state.users[id]?.name ?? '알 수 없음').join(', '))
                   }
                   style={[styles.reaction, on && styles.reactionOn]}
                 >
@@ -121,7 +122,7 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
                   style={styles.comment}
                   onLongPress={() =>
                     c.authorId === state.meId &&
-                    Alert.alert('댓글 삭제', '이 댓글을 삭제할까요?', [
+                    showAlert('댓글 삭제', '이 댓글을 삭제할까요?', [
                       { text: '취소', style: 'cancel' },
                       { text: '삭제', style: 'destructive', onPress: () => actions.deleteComment(log.id, c.id) },
                     ])

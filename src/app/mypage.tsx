@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar, Button, Chip, EmptyState, IconButton, monoText } from '../components/ui';
 import { useStore } from '../store/AppStore';
 import { colors, fonts, shadow } from '../theme';
 import { User } from '../types';
+import { showAlert } from '../utils/alert';
 
 type Tab = 'friends' | 'requests';
 
@@ -41,7 +42,7 @@ export default function MyPageScreen() {
   };
 
   const confirmRemove = (u: User) =>
-    Alert.alert('친구 해제', `${u.name}님을 친구 목록에서 삭제할까요?`, [
+    showAlert('친구 해제', `${u.name}님을 친구 목록에서 삭제할까요?`, [
       { text: '취소', style: 'cancel' },
       { text: '해제', style: 'destructive', onPress: () => actions.removeFriend(u.id) },
     ]);
@@ -205,10 +206,22 @@ export default function MyPageScreen() {
           </>
         )}
 
-        <Pressable
-          style={{ alignSelf: 'center', marginTop: 40 }}
+        <Button
+          title="로그아웃"
+          variant="outline"
+          icon="log-out-outline"
+          style={{ marginTop: 36 }}
           onPress={() =>
-            Alert.alert('데모 데이터 초기화', '모든 변경 사항을 지우고 처음 상태로 되돌릴까요?', [
+            showAlert('로그아웃', '로그아웃할까요?', [
+              { text: '취소', style: 'cancel' },
+              { text: '로그아웃', style: 'destructive', onPress: actions.logout },
+            ])
+          }
+        />
+        <Pressable
+          style={{ alignSelf: 'center', marginTop: 20 }}
+          onPress={() =>
+            showAlert('데모 데이터 초기화', '이 기기의 모든 계정과 변경 사항을 지우고 처음 상태로 되돌릴까요? 로그아웃돼요.', [
               { text: '취소', style: 'cancel' },
               { text: '초기화', style: 'destructive', onPress: actions.reset },
             ])

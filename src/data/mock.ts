@@ -1,8 +1,8 @@
-import { AppState, KnitLog } from '../types';
+import { Account, KnitLog, Project, RawState } from '../types';
 
 const t = (s: string) => new Date(s).toISOString();
 
-const users: AppState['users'] = {
+const users: RawState['users'] = {
   me: { id: 'me', name: '세은', handle: 'seeun_knits', bio: '뜨개 3년차 🧶 메리노 덕후', color: '#C4704A' },
   sungyu: { id: 'sungyu', name: '선규', handle: 'sungyu_kr', bio: '가끔 뜨개, 자주 커피', color: '#4A7BC4' },
   jiyeon: { id: 'jiyeon', name: '지연', handle: 'jiyeon_wool', bio: '울 실 컬렉터 | 대바늘 전문', color: '#7A9A72' },
@@ -18,16 +18,59 @@ const log = (l: Omit<KnitLog, 'reactions' | 'comments'> & Partial<KnitLog>): Kni
   ...l,
 });
 
-export function createInitialState(): AppState {
+const HASHES: Record<string, string> = {
+  seeun_knits: '2ab2a6da9131665ad1eafc316d83233a819c3ddfae377319ec502865dcc853a2',
+  sungyu_kr: 'caaa77c4d9a11fd704edf1debe5b08de1395a7497686ee1f11a6f0303455ad65',
+  jiyeon_wool: '7ec74a43d098a655a6718e3670a965b07173c0f554369bca822db020f34d18f4',
+  'minji.knit': '94ade4988a225493ac6750760e1967c370a177bd16a59c6aa60afb133f436b08',
+  sky_yarn: '29fcf3c0344cdb4122b5f9d1969039a2eb184dd87b31c397b8374e43006ba605',
+  doyun_stitch: '6fa4ba3a5791a650a2072d831eca2dad3a2d3d8a00d9342233a1fc86d7738603',
+  sua_loop: 'c8ae72b9f33db3654545246bcfe548dcac4d7ce8bdf1ea5fd4fdc2eda55d4a07',
+};
+
+/** 데모 계정: 모든 계정의 비밀번호는 1234 */
+export const DEMO_PASSWORD = '1234';
+
+const accounts: Account[] = Object.values(users).map((u) => ({
+  userId: u.id,
+  username: u.handle,
+  passwordHash: HASHES[u.handle],
+}));
+
+type ProjectSeed = Omit<Project, 'visibility' | 'maxMembers' | 'description' | 'applicantIds'> &
+  Partial<Pick<Project, 'visibility' | 'maxMembers' | 'description' | 'applicantIds'>>;
+
+const project = (p: ProjectSeed): Project => ({
+  visibility: 'private',
+  maxMembers: 4,
+  description: '',
+  applicantIds: [],
+  ...p,
+});
+
+export function createInitialState(): RawState {
   return {
-    meId: 'me',
+    session: null,
     users,
-    friendIds: ['sungyu', 'jiyeon'],
-    incomingRequestIds: ['minji', 'haneul'],
-    outgoingRequestIds: ['sua'],
+    accounts,
+    friendships: [
+      ['me', 'sungyu'],
+      ['me', 'jiyeon'],
+      ['sungyu', 'jiyeon'],
+      ['jiyeon', 'haneul'],
+    ],
+    friendRequests: [
+      { from: 'minji', to: 'me' },
+      { from: 'haneul', to: 'me' },
+      { from: 'me', to: 'sua' },
+    ],
+    invites: [
+      { id: 'i1', projectId: 'p9', from: 'jiyeon', to: 'me', createdAt: t('2026-09-27T20:00:00') },
+      { id: 'i2', projectId: 'p9', from: 'jiyeon', to: 'sungyu', createdAt: t('2026-09-27T20:00:00') },
+    ],
     timers: {},
     projects: [
-      {
+      project({
         id: 'p1',
         title: '후드 가디건 함뜨',
         yarn: '메리노울 아이보리 400g',
@@ -36,15 +79,14 @@ export function createInitialState(): AppState {
         type: 'group',
         ownerId: 'me',
         memberIds: ['me', 'sungyu', 'jiyeon'],
-        recruit: {
-          isOpen: true,
-          maxMembers: 4,
-          description: '같은 도안으로 후드 가디건 떠요. 주 1회 진행 공유!',
-          applicantIds: ['doyun'],
-        },
+        visibility: 'public',
+        code: 'HOOD24',
+        maxMembers: 4,
+        description: '같은 도안으로 후드 가디건 떠요. 주 1회 진행 공유!',
+        applicantIds: ['doyun'],
         createdAt: t('2026-09-01T10:00:00'),
-      },
-      {
+      }),
+      project({
         id: 'p2',
         title: '베레모 for 겨울',
         yarn: '알파카 혼방 그레이 150g',
@@ -53,9 +95,10 @@ export function createInitialState(): AppState {
         type: 'solo',
         ownerId: 'me',
         memberIds: ['me'],
+        code: 'BERET7',
         createdAt: t('2026-09-05T10:00:00'),
-      },
-      {
+      }),
+      project({
         id: 'p3',
         title: '크림 숄 가디건',
         yarn: '캐시미어 크림 550g',
@@ -64,9 +107,10 @@ export function createInitialState(): AppState {
         type: 'solo',
         ownerId: 'me',
         memberIds: ['me'],
+        code: 'CREAM5',
         createdAt: t('2026-09-20T10:00:00'),
-      },
-      {
+      }),
+      project({
         id: 'p4',
         title: '줄무늬 머플러',
         yarn: '울 믹스 네이비/화이트',
@@ -75,10 +119,11 @@ export function createInitialState(): AppState {
         type: 'group',
         ownerId: 'sungyu',
         memberIds: ['sungyu', 'me'],
+        code: 'STRIPE',
         createdAt: t('2026-07-01T10:00:00'),
-      },
-      // 다른 사람들이 공개 모집 중인 프로젝트
-      {
+      }),
+      // 다른 사람들이 연 공개방
+      project({
         id: 'p5',
         title: '모헤어 라글란 스웨터',
         yarn: '키드모헤어 + 실크 300g',
@@ -87,15 +132,13 @@ export function createInitialState(): AppState {
         type: 'group',
         ownerId: 'minji',
         memberIds: ['minji', 'doyun'],
-        recruit: {
-          isOpen: true,
-          maxMembers: 5,
-          description: '10월 첫째 주 시작해요. 탑다운 라글란 처음이신 분도 환영!',
-          applicantIds: [],
-        },
+        visibility: 'public',
+        code: 'MOHAIR',
+        maxMembers: 5,
+        description: '10월 첫째 주 시작해요. 탑다운 라글란 처음이신 분도 환영!',
         createdAt: t('2026-09-22T10:00:00'),
-      },
-      {
+      }),
+      project({
         id: 'p6',
         title: '양말 뜨기 입문 함뜨',
         yarn: '삭스얀 자유',
@@ -104,15 +147,13 @@ export function createInitialState(): AppState {
         type: 'group',
         ownerId: 'haneul',
         memberIds: ['haneul', 'jiyeon'],
-        recruit: {
-          isOpen: true,
-          maxMembers: 6,
-          description: '뒤꿈치 뜨기 같이 정복해요 🧦 매주 일요일 저녁 진행 공유',
-          applicantIds: [],
-        },
+        visibility: 'public',
+        code: 'SOCKS1',
+        maxMembers: 6,
+        description: '뒤꿈치 뜨기 같이 정복해요 🧦 매주 일요일 저녁 진행 공유',
         createdAt: t('2026-09-12T10:00:00'),
-      },
-      {
+      }),
+      project({
         id: 'p7',
         title: '아란 조끼 같이 떠요',
         yarn: '브리티시 울 오트밀 350g',
@@ -121,14 +162,40 @@ export function createInitialState(): AppState {
         type: 'group',
         ownerId: 'sua',
         memberIds: ['sua'],
-        recruit: {
-          isOpen: true,
-          maxMembers: 3,
-          description: '케이블 무늬 많은 조끼예요. 차트 도안 읽을 수 있는 분!',
-          applicantIds: [],
-        },
+        visibility: 'public',
+        code: 'ARAN33',
+        maxMembers: 3,
+        description: '케이블 무늬 많은 조끼예요. 차트 도안 읽을 수 있는 분!',
         createdAt: t('2026-09-25T10:00:00'),
-      },
+      }),
+      // 비공개방: 코드(KNIT42)로 검색하거나 초대받아야 참여 가능
+      project({
+        id: 'p8',
+        title: '니트 조끼 비밀 함뜨',
+        yarn: '램스울 차콜 250g',
+        needle: '4.0mm 대바늘',
+        status: 'ready',
+        type: 'group',
+        ownerId: 'doyun',
+        memberIds: ['doyun'],
+        code: 'KNIT42',
+        description: '회사 동기들끼리 뜨는 조끼',
+        createdAt: t('2026-09-24T10:00:00'),
+      }),
+      project({
+        id: 'p9',
+        title: '크리스마스 장갑 함뜨',
+        yarn: '셰틀랜드 울 레드/화이트',
+        needle: '3.0mm 장갑바늘',
+        status: 'ready',
+        type: 'group',
+        ownerId: 'jiyeon',
+        memberIds: ['jiyeon', 'haneul'],
+        code: 'XMAS25',
+        maxMembers: 5,
+        description: '페어아일 장갑 같이 떠요 🎄',
+        createdAt: t('2026-09-26T10:00:00'),
+      }),
     ],
     logs: [
       log({
@@ -137,7 +204,6 @@ export function createInitialState(): AppState {
         authorId: 'me',
         startedAt: t('2026-09-10T20:10:00'),
         durationSec: 2 * 3600,
-        rows: 30,
         text: '뒤판 30단 완성. 텐션이 처음보다 훨씬 고르게 잡힌다. 오늘 2시간 뜬 것 같아',
         reactions: [{ emoji: '👏', userIds: ['jiyeon'] }],
       }),
@@ -147,7 +213,6 @@ export function createInitialState(): AppState {
         authorId: 'me',
         startedAt: t('2026-09-13T14:00:00'),
         durationSec: 5400,
-        rows: 48,
         text: '오늘은 앞판 마무리. 넥라인 곡선이 생각보다 까다로웠지만 성공적 ✓',
         reactions: [
           { emoji: '❤️', userIds: ['sungyu', 'jiyeon', 'minji'] },
@@ -161,7 +226,6 @@ export function createInitialState(): AppState {
         authorId: 'me',
         startedAt: t('2026-09-15T21:00:00'),
         durationSec: 4200,
-        rows: 62,
         text: '드디어 소매 연결 완료! 어깨 부분이 생각보다 자연스럽게 이어졌다. 남은 건 후드 달기',
         reactions: [
           { emoji: '🧶', userIds: ['jiyeon', 'sungyu'] },
@@ -178,7 +242,6 @@ export function createInitialState(): AppState {
         authorId: 'sungyu',
         startedAt: t('2026-09-12T22:00:00'),
         durationSec: 3000,
-        rows: 18,
         text: '고무단 끝내고 몸판 시작. 게이지가 살짝 커서 바늘 한 호수 내렸어요.',
         reactions: [{ emoji: '❤️', userIds: ['jiyeon'] }],
       }),
@@ -188,7 +251,6 @@ export function createInitialState(): AppState {
         authorId: 'sungyu',
         startedAt: t('2026-09-17T21:30:00'),
         durationSec: 3600,
-        rows: 34,
         text: '뒤판 절반! 출퇴근 지하철에서 조금씩 뜨는 중',
       }),
       log({
@@ -197,7 +259,6 @@ export function createInitialState(): AppState {
         authorId: 'jiyeon',
         startedAt: t('2026-09-11T19:00:00'),
         durationSec: 7200,
-        rows: 40,
         text: '실 색이 사진보다 따뜻한 톤이라 너무 마음에 들어요. 뒤판 40단까지.',
         reactions: [{ emoji: '😍', userIds: ['me'] }],
         comments: [{ id: 'c4', authorId: 'me', text: '색 진짜 예쁘다!', createdAt: t('2026-09-11T21:30:00') }],
@@ -208,7 +269,6 @@ export function createInitialState(): AppState {
         authorId: 'jiyeon',
         startedAt: t('2026-09-18T20:00:00'),
         durationSec: 5400,
-        rows: 70,
         text: '앞판 두 장 다 떴어요. 이번 주말에 단추 사러 가야지 🛍',
       }),
       log({
@@ -217,7 +277,6 @@ export function createInitialState(): AppState {
         authorId: 'me',
         startedAt: t('2026-09-13T10:00:00'),
         durationSec: 2400,
-        rows: 12,
         text: '베레모 고무단 시작. 알파카라 보들보들하다',
       }),
       log({
@@ -226,7 +285,6 @@ export function createInitialState(): AppState {
         authorId: 'me',
         startedAt: t('2026-08-20T20:00:00'),
         durationSec: 3600,
-        rows: 220,
         text: '머플러 완성! 술 달고 스팀 블로킹까지 끝 🎉',
         reactions: [{ emoji: '🔥', userIds: ['sungyu'] }],
       }),
@@ -236,7 +294,6 @@ export function createInitialState(): AppState {
         authorId: 'sungyu',
         startedAt: t('2026-08-18T20:00:00'),
         durationSec: 4000,
-        rows: 200,
         text: '줄무늬 배색 바꿀 때마다 실 정리하는 게 제일 힘들었다',
       }),
     ],

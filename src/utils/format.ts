@@ -76,3 +76,6 @@ export const sortProjects = (projects: Project[], logs: KnitLog[]) =>
     const lb = lastActivity(b, logs) || b.createdAt;
     return lb.localeCompare(la);
   });
+
+/** 4:40 (시:분) */
+export const hoursMinutes = (sec: number) => `${Math.floor(sec / 3600)}:${pad(Math.floor((sec % 3600) / 60))}`;
