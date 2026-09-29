@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "뜨개로그",
+    "slug": "knittinglog",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.knittinglog.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F9F6F1",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.knittinglog.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "뜨개 기록에 사진을 첨부하기 위해 앨범에 접근합니다.",
+          "cameraPermission": "뜨개 기록 사진을 찍기 위해 카메라를 사용합니다."
+        }
+      ]
+    ],
+    "scheme": "knittinglog",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F9F6F1"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
