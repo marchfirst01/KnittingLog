@@ -69,6 +69,10 @@ export default function SignupScreen() {
         returnKeyType="go"
         onSubmitEditing={submit}
       />
+      <Text style={styles.terms}>
+        가입하면 <Text style={styles.termsLink} onPress={() => router.push('/policy?doc=terms')}>이용약관</Text>과{' '}
+        <Text style={styles.termsLink} onPress={() => router.push('/policy?doc=privacy')}>개인정보처리방침</Text>에 동의하게 돼요.
+      </Text>
       <Button title={loading ? '가입 중…' : '가입하기'} onPress={submit} disabled={loading} style={{ marginTop: 8 }} />
 
       <View style={styles.row}>
@@ -85,4 +89,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 20 },
   muted: { fontSize: 14, color: colors.textSub },
   link: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  terms: { fontSize: 12, lineHeight: 18, color: colors.textSub, textAlign: 'center', marginTop: 4, marginBottom: 4 },
+  termsLink: { color: colors.primary, textDecorationLine: 'underline' },
 });

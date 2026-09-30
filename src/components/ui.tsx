@@ -16,17 +16,20 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, fonts, radius, statusStyles } from '../theme';
-import { ProjectStatus, User } from '../types';
+import { MemberStatus, User } from '../types';
 
 export function Avatar({
   user,
   size = 28,
   ring,
+  gray,
   style,
 }: {
   user?: User;
   size?: number;
   ring?: boolean;
+  /** 흑백 처리 (프로젝트를 종료한 멤버 등) */
+  gray?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
@@ -36,7 +39,7 @@ export function Avatar({
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: user?.color ?? colors.textMuted,
+          backgroundColor: gray ? '#B8B2AC' : (user?.color ?? colors.textMuted),
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -59,7 +62,13 @@ export function AvatarStack({ users, size = 26 }: { users: (User | undefined)[];
   );
 }
 
-export function StatusBadge({ status, onPress }: { status: ProjectStatus; onPress?: () => void }) {
+export const statusDescriptions: Record<MemberStatus, string> = {
+  active: '지금 뜨고 있어요',
+  paused: '잠시 작업을 멈췄어요',
+  done: '내 기록을 마무리해요. 작업 기간이 자동으로 표시돼요',
+};
+
+export function StatusBadge({ status, onPress }: { status: MemberStatus; onPress?: () => void }) {
   const s = statusStyles[status];
   return (
     <Pressable
@@ -228,6 +237,48 @@ export function IconButton({
   );
 }
 
+export type MenuItem = {
+  label: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  destructive?: boolean;
+  onPress: () => void;
+};
+
+/** `…` 버튼 등에서 여는 선택지 목록 (하단 시트) */
+export function ActionMenu({
+  visible,
+  onClose,
+  title,
+  items,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title?: string;
+  items: MenuItem[];
+}) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title={title}>
+      {items.map((it) => (
+        <Pressable
+          key={it.label}
+          style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.6 }]}
+          onPress={() => {
+            onClose();
+            // 시트가 닫힌 뒤 다음 동작(알림창, 다른 시트)을 연다
+            setTimeout(it.onPress, 250);
+          }}
+        >
+          {it.icon && <Ionicons name={it.icon} size={20} color={it.destructive ? colors.danger : colors.text} />}
+          <Text style={[styles.menuText, it.destructive && { color: colors.danger }]}>{it.label}</Text>
+        </Pressable>
+      ))}
+      <Pressable style={[styles.menuItem, { justifyContent: 'center', borderBottomWidth: 0 }]} onPress={onClose}>
+        <Text style={styles.menuClose}>닫기</Text>
+      </Pressable>
+    </Sheet>
+  );
+}
+
 /** 하단에서 올라오는 시트 */
 export function Sheet({
   visible,
@@ -359,5 +410,15 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sheetTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 14 },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  menuText: { flex: 1, fontSize: 16, color: colors.text },
+  menuClose: { fontSize: 16, color: colors.textSub },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textSub, marginBottom: 8 },
 });

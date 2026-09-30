@@ -6,12 +6,23 @@ import { useStore } from '../store/AppStore';
 import { colors, fonts } from '../theme';
 import { KnitLog } from '../types';
 import { clockTime, duration, relative, shortDate } from '../utils/format';
-import { Avatar, IconButton, Thumb } from './ui';
+import { ActionMenu, Avatar, IconButton, Thumb } from './ui';
 import { showAlert } from '../utils/alert';
 
 export const EMOJIS = ['❤️', '👏', '🧶', '✨', '🔥', '😍'];
 
-export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean; onEdit: () => void }) {
+export function LogItem({
+  log,
+  isLast,
+  onEdit,
+  projectTitle,
+}: {
+  log: KnitLog;
+  isLast: boolean;
+  onEdit?: () => void;
+  /** 여러 프로젝트의 기록을 모아 볼 때 프로젝트 이름 표시 */
+  projectTitle?: string;
+}) {
   const { state, actions } = useStore();
   const me = state.users[state.meId];
   const mine = log.authorId === state.meId;
@@ -19,20 +30,12 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
   const [showPicker, setShowPicker] = useState(false);
   const [draft, setDraft] = useState('');
   const [zoom, setZoom] = useState(false);
+  const [menu, setMenu] = useState(false);
 
-  const openMenu = () =>
-    showAlert('기록', undefined, [
-      { text: '수정', onPress: onEdit },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: () =>
-          showAlert('기록 삭제', '이 기록을 삭제할까요? 되돌릴 수 없어요.', [
-            { text: '취소', style: 'cancel' },
-            { text: '삭제', style: 'destructive', onPress: () => actions.deleteLog(log.id) },
-          ]),
-      },
-      { text: '닫기', style: 'cancel' },
+  const confirmDelete = () =>
+    showAlert('기록 삭제', '이 기록을 삭제할까요? 되돌릴 수 없어요.', [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: () => actions.deleteLog(log.id) },
     ]);
 
   const submitComment = () => {
@@ -60,6 +63,11 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
       <View style={styles.body}>
         <View style={styles.head}>
           <View style={{ flex: 1 }}>
+            {!!projectTitle && (
+              <Text style={styles.project} numberOfLines={1}>
+                🧶 {projectTitle}
+              </Text>
+            )}
             <Text style={styles.date}>{shortDate(log.startedAt)}</Text>
             <Text style={styles.meta}>
               {clockTime(log.startedAt)} · {duration(log.durationSec)}
@@ -70,7 +78,7 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
             <Ionicons name="chatbubble-outline" size={18} color={colors.primary} />
             {log.comments.length > 0 && <Text style={styles.commentCount}>{log.comments.length}</Text>}
           </Pressable>
-          {mine && <IconButton name="ellipsis-horizontal" size={18} color={colors.textSub} onPress={openMenu} />}
+          {mine && onEdit && <IconButton name="ellipsis-horizontal" size={18} color={colors.textSub} onPress={() => setMenu(true)} />}
         </View>
 
         {showPicker && (
@@ -114,7 +122,7 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
 
         {showComments && (
           <View style={styles.comments}>
-            {log.comments.map((c) => {
+            {log.comments.filter((c) => !state.hiddenIds.includes(c.authorId)).map((c) => {
               const author = state.users[c.authorId];
               return (
                 <Pressable
@@ -156,6 +164,17 @@ export function LogItem({ log, isLast, onEdit }: { log: KnitLog; isLast: boolean
         )}
       </View>
 
+      {onEdit && (
+        <ActionMenu
+          visible={menu}
+          onClose={() => setMenu(false)}
+          items={[
+            { label: '수정', icon: 'create-outline', onPress: onEdit },
+            { label: '삭제', icon: 'trash-outline', destructive: true, onPress: confirmDelete },
+          ]}
+        />
+      )}
+
       <Modal visible={zoom} transparent animationType="fade" onRequestClose={() => setZoom(false)}>
         <Pressable style={styles.zoomBg} onPress={() => setZoom(false)}>
           {log.photoUri && <Image source={{ uri: log.photoUri }} style={styles.zoomImg} resizeMode="contain" />}
@@ -171,6 +190,7 @@ const styles = StyleSheet.create({
   line: { flex: 1, width: 1, backgroundColor: colors.primaryMuted, marginTop: 4, minHeight: 20 },
   body: { flex: 1, paddingBottom: 28 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  project: { fontSize: 12, fontWeight: '700', color: colors.textSub, marginBottom: 2 },
   date: { fontFamily: fonts.mono, fontSize: 15, fontWeight: '700', color: colors.primary },
   meta: { fontFamily: fonts.mono, fontSize: 12, color: colors.textSub, marginTop: 2 },
   commentBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, padding: 4 },

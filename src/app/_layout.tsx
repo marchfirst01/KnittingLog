@@ -20,7 +20,11 @@ function RootStack() {
         <Stack.Screen name="mypage" />
         <Stack.Screen name="project/[id]" />
         <Stack.Screen name="project/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="post/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="user/[id]" />
+        <Stack.Screen name="logs" />
       </Stack.Protected>
+      <Stack.Screen name="policy" />
     </Stack>
   );
 }

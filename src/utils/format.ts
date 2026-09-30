@@ -1,4 +1,4 @@
-import { KnitLog, Project, ProjectStatus } from '../types';
+import { KnitLog, Membership, MemberStatus } from '../types';
 
 export const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -60,20 +60,31 @@ export const parseDateTime = (date: string, time: string): Date | null => {
   return d;
 };
 
-const statusOrder: Record<ProjectStatus, number> = { active: 0, ready: 1, done: 2 };
+const statusOrder: Record<MemberStatus, number> = { active: 0, paused: 1, done: 2 };
 
-export const lastActivity = (project: Project, logs: KnitLog[]) =>
+/** 26.09.10 */
+export const dotDate = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
+};
+
+/** 26.09.10 ~ ing / 26.09.10 ~ 26.09.25 */
+export const period = (m: Pick<Membership, 'startedAt' | 'endedAt'>) =>
+  `${dotDate(m.startedAt)} ~ ${m.endedAt ? dotDate(m.endedAt) : 'ing'}`;
+
+/** 가장 최근 기록 시각 (없으면 '') */
+export const lastLogAt = (logs: KnitLog[], projectId: string, authorId: string) =>
   logs
-    .filter((l) => l.projectId === project.id)
+    .filter((l) => l.projectId === projectId && l.authorId === authorId)
     .reduce((max, l) => (l.startedAt > max ? l.startedAt : max), '');
 
-/** 작업 중 → 시작 전 → 종료, 같은 상태끼리는 최근 활동 순 */
-export const sortProjects = (projects: Project[], logs: KnitLog[]) =>
-  [...projects].sort((a, b) => {
+/** 진행중 → 보관 → 종료, 같은 상태끼리는 최근 활동 순 */
+export const sortMemberships = (list: Membership[], logs: KnitLog[]) =>
+  [...list].sort((a, b) => {
     const s = statusOrder[a.status] - statusOrder[b.status];
     if (s) return s;
-    const la = lastActivity(a, logs) || a.createdAt;
-    const lb = lastActivity(b, logs) || b.createdAt;
+    const la = lastLogAt(logs, a.projectId, a.userId) || a.startedAt;
+    const lb = lastLogAt(logs, b.projectId, b.userId) || b.startedAt;
     return lb.localeCompare(la);
   });
 

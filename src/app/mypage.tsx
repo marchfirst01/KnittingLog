@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar, Button, Chip, EmptyState, IconButton, monoText } from '../components/ui';
@@ -20,19 +20,23 @@ export default function MyPageScreen() {
   const [query, setQuery] = useState('');
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState(me.bio);
+  const [showBlocked, setShowBlocked] = useState(false);
 
   const stats = useMemo(
     () => ({
-      projects: state.projects.filter((p) => p.memberIds.includes(state.meId)).length,
+      projects: state.memberships.filter((m) => m.userId === state.meId).length,
       logs: state.logs.filter((l) => l.authorId === state.meId).length,
     }),
-    [state.projects, state.logs, state.meId],
+    [state.memberships, state.logs, state.meId],
   );
 
   const q = query.trim().toLowerCase().replace(/^@/, '');
   const searchResults = q
     ? Object.values(state.users).filter(
-        (u) => u.id !== state.meId && (u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)),
+        (u) =>
+          u.id !== state.meId &&
+          !state.hiddenIds.includes(u.id) &&
+          (u.name.toLowerCase().includes(q) || u.handle.toLowerCase().includes(q)),
       )
     : [];
 
@@ -122,6 +126,49 @@ export default function MyPageScreen() {
           ) : (
             <Text style={styles.bio}>{me.bio || '아직 소개가 없어요.'}</Text>
           )}
+
+          <View style={styles.divider} />
+          <View style={styles.privacyRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowTitle}>프로필 공개</Text>
+              <Text style={styles.rowDesc}>
+                {me.isPrivate
+                  ? '비공개: 다른 사람이 내 프로필에서 기록을 볼 수 없어요. 함께 하는 프로젝트의 공유 기록 탭에서는 보여요.'
+                  : '공개: 누구나 내 프로필에서 모든 기록을 볼 수 있어요.'}
+              </Text>
+            </View>
+            <Switch
+              value={!me.isPrivate}
+              onValueChange={(v) => actions.setPrivate(!v)}
+              trackColor={{ true: colors.primary, false: colors.borderStrong }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        {/* 메뉴 */}
+        <View style={[styles.card, { paddingVertical: 4 }]}>
+          <MenuRow icon="albums-outline" label="내 기록 모아보기" onPress={() => router.push('/logs')} />
+          <MenuRow icon="person-circle-outline" label="내 프로필 미리보기" onPress={() => router.push(`/user/${state.meId}`)} />
+          <MenuRow
+            icon="ban-outline"
+            label={`차단한 사용자 ${state.blockedIds.length}`}
+            onPress={() => setShowBlocked((v) => !v)}
+            expanded={showBlocked}
+          />
+          {showBlocked && (
+            <View style={{ paddingBottom: 10 }}>
+              {state.blockedIds.length === 0 && <Text style={[styles.muted, { paddingVertical: 8 }]}>차단한 사용자가 없어요.</Text>}
+              {state.blockedIds.map((id) => (
+                <View key={id} style={styles.blockedRow}>
+                  <Avatar user={state.users[id]} size={30} gray />
+                  <Text style={[styles.rowTitle, { flex: 1 }]}>{state.users[id]?.name}</Text>
+                  <Button small variant="outline" title="차단 해제" onPress={() => actions.unblock(id)} />
+                </View>
+              ))}
+            </View>
+          )}
+          <MenuRow icon="document-text-outline" label="약관 및 정책" onPress={() => router.push('/policy')} last />
         </View>
 
         {/* 검색 */}
@@ -234,6 +281,32 @@ export default function MyPageScreen() {
   );
 }
 
+function MenuRow({
+  icon,
+  label,
+  onPress,
+  expanded,
+  last,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  expanded?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, last && { borderBottomWidth: 0 }, pressed && { opacity: 0.6 }]}>
+      <Ionicons name={icon} size={20} color={colors.text} />
+      <Text style={[styles.rowTitle, { flex: 1 }]}>{label}</Text>
+      <Ionicons
+        name={expanded === undefined ? 'chevron-forward' : expanded ? 'chevron-up' : 'chevron-down'}
+        size={16}
+        color={colors.textMuted}
+      />
+    </Pressable>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
@@ -247,6 +320,7 @@ function PersonRow({ user, right }: { user?: User; right: React.ReactNode }) {
   if (!user) return null;
   return (
     <View style={styles.person}>
+      <Pressable onPress={() => router.push(`/user/${user.id}`)} style={styles.personLink}>
       <Avatar user={user} size={52} />
       <View style={{ flex: 1 }}>
         <Text style={styles.personName}>{user.name}</Text>
@@ -257,6 +331,7 @@ function PersonRow({ user, right }: { user?: User; right: React.ReactNode }) {
           </Text>
         )}
       </View>
+      </Pressable>
       {right}
     </View>
   );
@@ -266,6 +341,19 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 6 },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   container: { paddingHorizontal: 20, paddingTop: 10 },
+  privacyRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
+  rowDesc: { fontSize: 12, lineHeight: 17, color: colors.textSub, marginTop: 3 },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 15,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  blockedRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  personLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 22,

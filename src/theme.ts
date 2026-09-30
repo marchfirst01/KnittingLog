@@ -19,8 +19,8 @@ export const colors = {
 };
 
 export const statusStyles = {
-  active: { label: '작업 중', bg: '#E6F6EE', fg: '#2E9E6A' },
-  ready: { label: '시작 전', bg: '#FFF5DE', fg: '#C68A1E' },
+  active: { label: '진행중', bg: '#E6F6EE', fg: '#2E9E6A' },
+  paused: { label: '보관', bg: '#FFF5DE', fg: '#C68A1E' },
   done: { label: '종료', bg: '#F0EDE9', fg: '#7D746C' },
 } as const;
 

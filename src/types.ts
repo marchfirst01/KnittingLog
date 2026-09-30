@@ -1,6 +1,5 @@
-export type ProjectStatus = 'active' | 'ready' | 'done';
-export type ProjectType = 'solo' | 'group';
-export type Visibility = 'public' | 'private';
+/** 개인별 프로젝트 상태: 진행중 / 보관(잠시 중단) / 종료(본인 기록 종료) */
+export type MemberStatus = 'active' | 'paused' | 'done';
 
 export interface User {
   id: string;
@@ -8,6 +7,8 @@ export interface User {
   handle: string;
   bio: string;
   color: string;
+  /** 비공개 프로필이면 프로필 페이지에서 기록을 볼 수 없다 (공유 중인 프로젝트 안에서는 보임) */
+  isPrivate: boolean;
 }
 
 export interface Account {
@@ -17,27 +18,34 @@ export interface Account {
   passwordHash: string;
 }
 
+/** 프로젝트 자체는 이름·대표 사진·방장만 가진다. 상태·실·기록은 멤버 개인 소유 */
 export interface Project {
   id: string;
   title: string;
-  yarn: string;
-  needle: string;
-  status: ProjectStatus;
-  /** 혼자 뜨기 / 함뜨 — 나중에 전환 가능 */
-  type: ProjectType;
   ownerId: string;
-  memberIds: string[];
   coverUri?: string;
   createdAt: string;
-  /** 아래는 함뜨 설정. 혼자 뜨기일 때도 값은 유지돼서 다시 함뜨로 바꾸면 그대로 쓴다. */
-  /** 공개: '모집 중'에 노출, 참여 신청 → 방장 수락 / 비공개: 참여 코드나 초대로만 참여 */
-  visibility: Visibility;
-  /** 참여 코드 (공개/비공개 모두 코드로 바로 참여 가능) */
-  code: string;
-  maxMembers: number;
-  description: string;
-  /** 공개방 참여 신청자 */
-  applicantIds: string[];
+}
+
+export interface Counter {
+  label: string;
+  value: number;
+  max: number;
+}
+
+/** 프로젝트에 대한 한 사람의 참여 정보 (개인 소유) */
+export interface Membership {
+  projectId: string;
+  userId: string;
+  status: MemberStatus;
+  /** 작업 시작일 (ISO) */
+  startedAt: string;
+  /** 종료로 바꾼 날 (ISO) */
+  endedAt?: string;
+  yarn: string;
+  needle: string;
+  counters: [Counter, Counter];
+  joinedAt: string;
 }
 
 export interface FriendRequest {
@@ -78,6 +86,37 @@ export interface KnitLog {
   comments: Comment[];
 }
 
+/** 커뮤니티 게시글 (작품 자랑) */
+export interface Post {
+  id: string;
+  authorId: string;
+  photoUri?: string;
+  text: string;
+  /** 연결한 내 프로젝트 (선택) */
+  projectId?: string;
+  projectTitle?: string;
+  likeIds: string[];
+  comments: Comment[];
+  createdAt: string;
+}
+
+export type ReportReason = 'spam' | 'abuse' | 'inappropriate' | 'impersonation' | 'etc';
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  targetUserId: string;
+  targetPostId?: string;
+  reason: ReportReason;
+  detail: string;
+  createdAt: string;
+}
+
+export interface Block {
+  blocker: string;
+  blocked: string;
+}
+
 export interface TimerState {
   /** 실행 중이면 마지막으로 시작한 시각(ms), 멈춰 있으면 null */
   runningSince: number | null;
@@ -96,7 +135,11 @@ export interface RawState {
   friendRequests: FriendRequest[];
   invites: ProjectInvite[];
   projects: Project[];
+  memberships: Membership[];
   logs: KnitLog[];
+  posts: Post[];
+  reports: Report[];
+  blocks: Block[];
   /** userId → projectId → 타이머 */
   timers: Record<string, Record<string, TimerState>>;
 }
@@ -109,6 +152,10 @@ export interface AppState extends Omit<RawState, 'timers'> {
   outgoingRequestIds: string[];
   /** 내가 받은 프로젝트 초대 */
   incomingInvites: ProjectInvite[];
+  /** 내가 차단한 유저 */
+  blockedIds: string[];
+  /** 나를 차단했거나 내가 차단한 유저 (서로 안 보임) */
+  hiddenIds: string[];
   /** 내 타이머 (projectId → 타이머) */
   timers: Record<string, TimerState>;
 }
