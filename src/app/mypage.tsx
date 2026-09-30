@@ -133,7 +133,7 @@ export default function MyPageScreen() {
               <Text style={styles.rowTitle}>프로필 공개</Text>
               <Text style={styles.rowDesc}>
                 {me.isPrivate
-                  ? '비공개: 다른 사람이 내 프로필에서 기록을 볼 수 없어요. 함께 하는 프로젝트의 공유 기록 탭에서는 보여요.'
+                  ? '비공개: 다른 사람이 내 프로필에서 기록을 볼 수 없어요. 함께 하는 프로젝트 안에서는 보여요.'
                   : '공개: 누구나 내 프로필에서 모든 기록을 볼 수 있어요.'}
               </Text>
             </View>

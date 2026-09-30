@@ -147,7 +147,7 @@ export default function UserProfileScreen() {
                   <EmptyState
                     emoji="🔒"
                     title="비공개 프로필이에요"
-                    desc="함께 하는 프로젝트가 있다면 그 프로젝트의 공유 기록 탭에서 볼 수 있어요."
+                    desc="함께 하는 프로젝트가 있다면 그 프로젝트 안에서는 기록을 볼 수 있어요."
                   />
                 ) : logs.length === 0 ? (
                   <EmptyState emoji="📝" title="아직 기록이 없어요" />

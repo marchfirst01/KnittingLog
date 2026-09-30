@@ -76,7 +76,7 @@ export function InviteSheet({ project, onClose }: { project: Project; onClose: (
   return (
     <Sheet visible onClose={onClose} title="친구 초대">
       <Text style={[styles.help, { marginBottom: 12 }]}>
-        초대를 수락한 친구와 공유 기록 탭에서 서로의 기록을 함께 볼 수 있어요. 상태와 기록은 각자 관리해요.
+        초대를 수락한 친구는 프로젝트 상단 멤버 아이콘에 나타나고, 눌러서 서로의 기록을 볼 수 있어요. 상태와 기록은 각자 관리해요.
       </Text>
       {friends.length === 0 && <Text style={styles.muted}>초대할 수 있는 친구가 없어요. 마이페이지에서 친구를 추가해 보세요.</Text>}
       {friends.map((fid) => (

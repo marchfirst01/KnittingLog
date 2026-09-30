@@ -112,7 +112,7 @@ function setTimer(state: RawState, userId: string, projectId: string, timer: Tim
 }
 
 /**
- * 멤버가 공유 프로젝트에서 빠질 때(나가기·추방): 공유 탭에서는 사라지지만
+ * 멤버가 공유 프로젝트에서 빠질 때(나가기·추방): 방에서는 빠지지만
  * 그 사람의 상태·실 정보·기록은 새 개인 프로젝트로 옮겨서 계속 이어 쓸 수 있게 한다.
  */
 function detachMember(state: RawState, projectId: string, userId: string, newProjectId: string): RawState {

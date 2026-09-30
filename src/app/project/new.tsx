@@ -84,7 +84,7 @@ export default function NewProjectScreen() {
         <View style={styles.inviteBox}>
           <SectionLabel>친구 초대 (선택)</SectionLabel>
           <Text style={styles.muted}>
-            프로젝트는 기본으로 나만 볼 수 있어요. 친구를 초대하면 공유 기록 탭이 생겨 함께 볼 수 있고, 상태·실·기록은 각자
+            프로젝트는 기본으로 나만 볼 수 있어요. 친구를 초대하면 상단 멤버 아이콘을 눌러 서로의 기록을 볼 수 있고, 상태·실·기록은 각자
             관리해요.
           </Text>
           {friends.length === 0 ? (
