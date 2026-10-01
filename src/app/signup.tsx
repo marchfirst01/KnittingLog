@@ -6,12 +6,12 @@ import { AuthField, AuthLayout } from '../components/AuthForm';
 import { Button } from '../components/ui';
 import { useStore } from '../store/AppStore';
 import { colors } from '../theme';
-
-const USERNAME_RE = /^[a-z0-9_.]{4,20}$/;
+import { ID_RE, ID_RULE, normalizeId } from '../utils/validate';
 
 export default function SignupScreen() {
   const { state, actions } = useStore();
   const [username, setUsername] = useState('');
+  const [handle, setHandle] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -19,14 +19,22 @@ export default function SignupScreen() {
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const id = username.trim().toLowerCase();
+  const id = normalizeId(username);
+  const h = normalizeId(handle);
   const errors = {
     username: !id
-      ? '아이디를 입력해 주세요.'
-      : !USERNAME_RE.test(id)
-        ? '영문 소문자, 숫자, _ . 만 사용해 4~20자로 입력해 주세요.'
+      ? '로그인 아이디를 입력해 주세요.'
+      : !ID_RE.test(id)
+        ? ID_RULE
         : state.accounts.some((a) => a.username === id)
           ? '이미 사용 중인 아이디예요.'
+          : '',
+    handle: !h
+      ? '계정 ID를 입력해 주세요.'
+      : !ID_RE.test(h)
+        ? ID_RULE
+        : Object.values(state.users).some((u) => u.handle === h)
+          ? '이미 사용 중인 계정 ID예요.'
           : serverError,
     name: !name.trim() ? '닉네임을 입력해 주세요.' : name.trim().length > 10 ? '닉네임은 10자 이하로 입력해 주세요.' : '',
     password: password.length < 4 ? '비밀번호는 4자 이상이어야 해요.' : '',
@@ -39,7 +47,7 @@ export default function SignupScreen() {
     setSubmitted(true);
     if (!valid) return;
     setLoading(true);
-    const err = await actions.signup(id, password, name.trim());
+    const err = await actions.signup(id, h, password, name.trim());
     setLoading(false);
     if (err) setServerError(err);
   };
@@ -47,15 +55,23 @@ export default function SignupScreen() {
   return (
     <AuthLayout subtitle="새 계정 만들기">
       <AuthField
-        label="아이디"
+        label="로그인 아이디"
         value={username}
+        onChangeText={setUsername}
+        placeholder="예: seeun2026"
+        hint="로그인할 때만 쓰고 다른 사람에게 보이지 않아요. 가입 후에는 바꿀 수 없어요."
+        error={show('username')}
+      />
+      <AuthField
+        label="계정 ID"
+        value={handle}
         onChangeText={(v) => {
-          setUsername(v);
+          setHandle(v);
           setServerError('');
         }}
         placeholder="예: knit_lover"
-        hint="친구가 나를 찾을 때 쓰는 핸들이에요. 가입 후에는 바꿀 수 없어요."
-        error={show('username')}
+        hint="친구가 나를 찾을 때 쓰는 @아이디예요. 나중에 마이페이지에서 바꿀 수 있어요."
+        error={show('handle')}
       />
       <AuthField label="닉네임" value={name} onChangeText={setName} placeholder="예: 세은" error={show('name')} />
       <AuthField label="비밀번호" value={password} onChangeText={setPassword} placeholder="4자 이상" secure error={show('password')} />

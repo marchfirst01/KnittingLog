@@ -3,13 +3,13 @@ import { Account, Counter, KnitLog, Membership, Post, RawState } from '../types'
 const t = (s: string) => new Date(s).toISOString();
 
 const users: RawState['users'] = {
-  me: { id: 'me', name: '세은', handle: 'seeun_knits', bio: '뜨개 3년차 🧶 메리노 덕후', color: '#C4704A', isPrivate: false },
-  sungyu: { id: 'sungyu', name: '선규', handle: 'sungyu_kr', bio: '가끔 뜨개, 자주 커피', color: '#4A7BC4', isPrivate: false },
-  jiyeon: { id: 'jiyeon', name: '지연', handle: 'jiyeon_wool', bio: '울 실 컬렉터 | 대바늘 전문', color: '#7A9A72', isPrivate: false },
-  minji: { id: 'minji', name: '민지', handle: 'minji.knit', bio: '코바늘로 시작해 대바늘로 정착', color: '#9A7AB8', isPrivate: false },
-  haneul: { id: 'haneul', name: '하늘', handle: 'sky_yarn', bio: '양말만 30켤레 뜬 사람', color: '#4E9C9A', isPrivate: false },
-  doyun: { id: 'doyun', name: '도윤', handle: 'doyun_stitch', bio: '퇴근 후 한 시간 뜨개', color: '#C49A3A', isPrivate: true },
-  sua: { id: 'sua', name: '수아', handle: 'sua_loop', bio: '아란 무늬 좋아해요', color: '#C45A7A', isPrivate: true },
+  me: { id: 'me', name: '세은', handle: 'seeun_knits', bio: '뜨개 3년차 🧶 메리노 덕후', color: '#C4704A', visibility: 'public' },
+  sungyu: { id: 'sungyu', name: '선규', handle: 'sungyu_kr', bio: '가끔 뜨개, 자주 커피', color: '#4A7BC4', visibility: 'friends' },
+  jiyeon: { id: 'jiyeon', name: '지연', handle: 'jiyeon_wool', bio: '울 실 컬렉터 | 대바늘 전문', color: '#7A9A72', visibility: 'public' },
+  minji: { id: 'minji', name: '민지', handle: 'minji.knit', bio: '코바늘로 시작해 대바늘로 정착', color: '#9A7AB8', visibility: 'public' },
+  haneul: { id: 'haneul', name: '하늘', handle: 'sky_yarn', bio: '양말만 30켤레 뜬 사람', color: '#4E9C9A', visibility: 'public' },
+  doyun: { id: 'doyun', name: '도윤', handle: 'doyun_stitch', bio: '퇴근 후 한 시간 뜨개', color: '#C49A3A', visibility: 'private' },
+  sua: { id: 'sua', name: '수아', handle: 'sua_loop', bio: '아란 무늬 좋아해요', color: '#C45A7A', visibility: 'private' },
 };
 
 const log = (l: Omit<KnitLog, 'reactions' | 'comments'> & Partial<KnitLog>): KnitLog => ({
@@ -18,14 +18,15 @@ const log = (l: Omit<KnitLog, 'reactions' | 'comments'> & Partial<KnitLog>): Kni
   ...l,
 });
 
-const HASHES: Record<string, string> = {
-  seeun_knits: '2ab2a6da9131665ad1eafc316d83233a819c3ddfae377319ec502865dcc853a2',
-  sungyu_kr: 'caaa77c4d9a11fd704edf1debe5b08de1395a7497686ee1f11a6f0303455ad65',
-  jiyeon_wool: '7ec74a43d098a655a6718e3670a965b07173c0f554369bca822db020f34d18f4',
-  'minji.knit': '94ade4988a225493ac6750760e1967c370a177bd16a59c6aa60afb133f436b08',
-  sky_yarn: '29fcf3c0344cdb4122b5f9d1969039a2eb184dd87b31c397b8374e43006ba605',
-  doyun_stitch: '6fa4ba3a5791a650a2072d831eca2dad3a2d3d8a00d9342233a1fc86d7738603',
-  sua_loop: 'c8ae72b9f33db3654545246bcfe548dcac4d7ce8bdf1ea5fd4fdc2eda55d4a07',
+/** 로그인 아이디(변경 불가)와 비밀번호 해시. 계정 ID(handle)와는 별개 */
+const LOGINS: Record<string, { username: string; hash: string }> = {
+  me: { username: 'seeun', hash: 'f082002b7ebf2b1612c605da398ec7f902a67f36cfebdc1bee528c8c9b99eb98' },
+  sungyu: { username: 'sungyu', hash: '63887f4bb307324eb94e22d355860eed89dc8db2dea819f79d81bdcc83e13662' },
+  jiyeon: { username: 'jiyeon', hash: '03da2ac6f4a58feae153a9afc56263ef5a9167ba25ba4f2958e87970dbc8e078' },
+  minji: { username: 'minji', hash: '869799fb566db4c26c6e2783ae0b341c78a433339323e016ebbef0e4a764386d' },
+  haneul: { username: 'haneul', hash: 'fee505d6c170bc354619eb9c92b0f82faef8eb3d4b0ca2d3df7e581d20ae4596' },
+  doyun: { username: 'doyun', hash: 'e6440d31a091c4d89fbc7a6ff42674633cb3b6139dbbfe108fa935e6ceeb6e8d' },
+  sua: { username: 'sua', hash: 'f863dd282116114504b74f5ba5f5652df3d001cfa264e193d047d33265487e3a' },
 };
 
 /** 데모 계정: 모든 계정의 비밀번호는 1234 */
@@ -33,14 +34,21 @@ export const DEMO_PASSWORD = '1234';
 
 const accounts: Account[] = Object.values(users).map((u) => ({
   userId: u.id,
-  username: u.handle,
-  passwordHash: HASHES[u.handle],
+  username: LOGINS[u.id].username,
+  passwordHash: LOGINS[u.id].hash,
 }));
 
-export const defaultCounters = (): [Counter, Counter] => [
-  { label: '단', value: 0, max: 40 },
-  { label: '무늬 반복', value: 0, max: 8 },
-];
+let counterSeq = 0;
+export const makeCounter = (label: string, max: number, value = 0, updatedAt = new Date().toISOString()): Counter => ({
+  id: `c${Date.now().toString(36)}${(counterSeq++).toString(36)}${Math.random().toString(36).slice(2, 5)}`,
+  label,
+  value,
+  max,
+  visible: true,
+  updatedAt,
+});
+
+export const defaultCounters = (): Counter[] => [makeCounter('단수 카운터 1', 40), makeCounter('단수 카운터 2', 20)];
 
 const member = (
   m: Pick<Membership, 'projectId' | 'userId' | 'status' | 'startedAt' | 'yarn' | 'needle'> & Partial<Membership>,
@@ -91,8 +99,8 @@ export function createInitialState(): RawState {
         yarn: '메리노울 아이보리 400g',
         needle: '5.0mm 대바늘',
         counters: [
-          { label: '단', value: 62, max: 80 },
-          { label: '무늬 반복', value: 3, max: 8 },
+          makeCounter('몸판', 80, 62, t('2026-09-15T22:10:00')),
+          makeCounter('무늬 반복', 8, 3, t('2026-09-15T22:05:00')),
         ],
       }),
       member({
@@ -119,10 +127,7 @@ export function createInitialState(): RawState {
         startedAt: t('2026-09-13T10:00:00'),
         yarn: '알파카 혼방 그레이 150g',
         needle: '4.0mm 줄바늘',
-        counters: [
-          { label: '단', value: 12, max: 30 },
-          { label: '무늬 반복', value: 0, max: 6 },
-        ],
+        counters: [makeCounter('고무단', 30, 12, t('2026-09-13T10:40:00'))],
       }),
       member({
         projectId: 'p3',

@@ -114,9 +114,10 @@ export function LogItem({
 
         {!!log.text && <Text style={styles.text}>{log.text}</Text>}
 
-        {log.comments.length > 0 && !showComments && (
-          <Pressable onPress={() => setShowComments(true)} hitSlop={6}>
-            <Text style={styles.more}>댓글 {log.comments.length}개 보기</Text>
+        {(log.comments.length > 0 || showComments) && (
+          <Pressable onPress={() => setShowComments((v) => !v)} hitSlop={6} style={styles.toggle}>
+            <Text style={styles.more}>{showComments ? '댓글 접기' : `댓글 ${log.comments.length}개 보기`}</Text>
+            <Ionicons name={showComments ? 'chevron-up' : 'chevron-down'} size={13} color={colors.primaryMuted} />
           </Pressable>
         )}
 
@@ -223,6 +224,7 @@ const styles = StyleSheet.create({
   reactionOn: { backgroundColor: colors.primarySoft, borderColor: colors.primaryMuted },
   reactionCount: { fontSize: 12, color: colors.textSub, fontWeight: '600' },
   text: { fontSize: 15, lineHeight: 23, color: colors.text },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start' },
   more: { marginTop: 10, fontSize: 13, fontWeight: '700', color: colors.primaryMuted },
   comments: { marginTop: 10, gap: 10 },
   comment: { flexDirection: 'row', gap: 8 },

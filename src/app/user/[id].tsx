@@ -8,9 +8,10 @@ import { LogItem } from '../../components/LogItem';
 import { PostCard } from '../../components/PostCard';
 import { ReportSheet } from '../../components/ReportSheet';
 import { ActionMenu, Avatar, Button, EmptyState, IconButton, MenuItem, Segmented, monoText } from '../../components/ui';
-import { useStore } from '../../store/AppStore';
+import { canViewProfileLogs, useStore, visibilityLabels } from '../../store/AppStore';
 import { colors, fonts, shadow } from '../../theme';
 import { showAlert } from '../../utils/alert';
+import { hoursMinutes } from '../../utils/format';
 
 type Tab = 'logs' | 'posts';
 
@@ -54,7 +55,8 @@ export default function UserProfileScreen() {
   const blockedByMe = state.blockedIds.includes(id);
   const blockedMe = !blockedByMe && state.hiddenIds.includes(id);
   const isFriend = state.friendIds.includes(id);
-  const canSeeLogs = isMe || !user.isPrivate;
+  const canSeeLogs = canViewProfileLogs(state, id);
+  const totalSec = logs.reduce((sum, l) => sum + l.durationSec, 0);
 
   const block = () =>
     showAlert(`${user.name}님 차단`, '차단하면 서로의 프로필·게시글·기록이 보이지 않고, 친구 관계와 요청·초대가 모두 끊어져요.', [
@@ -103,7 +105,12 @@ export default function UserProfileScreen() {
             <View style={{ flex: 1, gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={styles.name}>{user.name}</Text>
-                {user.isPrivate && <Ionicons name="lock-closed" size={14} color={colors.textSub} />}
+                {user.visibility !== 'public' && (
+                  <View style={styles.visTag}>
+                    <Ionicons name={user.visibility === 'friends' ? 'people' : 'lock-closed'} size={11} color={colors.textSub} />
+                    <Text style={styles.visText}>{visibilityLabels[user.visibility]}</Text>
+                  </View>
+                )}
               </View>
               <Text style={monoText}>@{user.handle}</Text>
             </View>
@@ -114,6 +121,7 @@ export default function UserProfileScreen() {
               <View style={styles.stats}>
                 <Stat label="프로젝트" value={projectCount} />
                 <Stat label="기록" value={canSeeLogs ? logs.length : '-'} />
+                <Stat label="총 뜨개 시간" value={canSeeLogs ? hoursMinutes(totalSec) : '-'} />
                 <Stat label="게시글" value={posts.length} />
               </View>
               {friendButton && <View style={{ marginTop: 16 }}>{friendButton}</View>}
@@ -146,7 +154,7 @@ export default function UserProfileScreen() {
                 !canSeeLogs ? (
                   <EmptyState
                     emoji="🔒"
-                    title="비공개 프로필이에요"
+                    title={user.visibility === 'friends' ? '친구에게만 공개된 프로필이에요' : '비공개 프로필이에요'}
                     desc="함께 하는 프로젝트가 있다면 그 프로젝트 안에서는 기록을 볼 수 있어요."
                   />
                 ) : logs.length === 0 ? (
@@ -206,6 +214,8 @@ const styles = StyleSheet.create({
   },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   name: { fontSize: 20, fontWeight: '700', color: colors.text, fontFamily: fonts.serif },
+  visTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.chipBg, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  visText: { fontSize: 11, fontWeight: '600', color: colors.textSub },
   bio: { fontSize: 15, color: colors.text, lineHeight: 22, marginTop: 14 },
   stats: { flexDirection: 'row', marginTop: 16 },
   statNum: { fontFamily: fonts.mono, fontSize: 18, fontWeight: '700', color: colors.text },

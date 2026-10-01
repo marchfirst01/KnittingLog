@@ -80,7 +80,7 @@ export function PostCard({ post }: { post: Post }) {
         {post.photoUri ? (
           <Image source={{ uri: post.photoUri }} style={StyleSheet.absoluteFill} />
         ) : (
-          <Text style={{ fontSize: 64 }}>🧶</Text>
+          <Text style={{ fontSize: 48 }}>🧶</Text>
         )}
       </View>
 
@@ -106,9 +106,10 @@ export function PostCard({ post }: { post: Post }) {
             {post.text}
           </Text>
         )}
-        {post.comments.length > 0 && !showComments && (
-          <Pressable onPress={() => setShowComments(true)}>
-            <Text style={styles.more}>댓글 {post.comments.length}개 보기</Text>
+        {(post.comments.length > 0 || showComments) && (
+          <Pressable onPress={() => setShowComments((v) => !v)} hitSlop={6} style={styles.toggle}>
+            <Text style={styles.more}>{showComments ? '댓글 접기' : `댓글 ${post.comments.length}개 보기`}</Text>
+            <Ionicons name={showComments ? 'chevron-up' : 'chevron-down'} size={13} color={colors.textSub} />
           </Pressable>
         )}
         {showComments && (
@@ -163,12 +164,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadow,
   },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
   author: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   name: { fontSize: 14, fontWeight: '700', color: colors.text },
   time: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
-  photo: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  body: { padding: 14, gap: 6 },
+  // 피드에서 사진이 화면을 다 덮지 않도록 여백을 두고 16:10 비율로 줄인다
+  photo: {
+    marginHorizontal: 12,
+    aspectRatio: 16 / 10,
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14, gap: 6 },
   actions: { flexDirection: 'row', gap: 16 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   count: { fontSize: 14, fontWeight: '600', color: colors.text },
@@ -182,6 +191,7 @@ const styles = StyleSheet.create({
   },
   projectTagText: { fontSize: 12, fontWeight: '600', color: colors.primaryDark },
   text: { fontSize: 14, lineHeight: 21, color: colors.text },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start' },
   more: { fontSize: 13, color: colors.textSub, marginTop: 2 },
   comment: { fontSize: 13, lineHeight: 19, color: colors.text },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

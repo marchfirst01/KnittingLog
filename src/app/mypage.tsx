@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar, Button, Chip, EmptyState, IconButton, monoText } from '../components/ui';
+import { Avatar, Button, Chip, EmptyState, IconButton, Segmented, monoText } from '../components/ui';
 import { useStore } from '../store/AppStore';
 import { colors, fonts, shadow } from '../theme';
-import { User } from '../types';
+import { ProfileVisibility, User } from '../types';
 import { showAlert } from '../utils/alert';
+import { hoursMinutes } from '../utils/format';
+import { ID_RE, ID_RULE, normalizeId } from '../utils/validate';
 
 type Tab = 'friends' | 'requests';
 
@@ -21,11 +23,36 @@ export default function MyPageScreen() {
   const [editingBio, setEditingBio] = useState(false);
   const [bioDraft, setBioDraft] = useState(me.bio);
   const [showBlocked, setShowBlocked] = useState(false);
+  const [editingHandle, setEditingHandle] = useState(false);
+  const [handleDraft, setHandleDraft] = useState(me.handle);
+  const [handleError, setHandleError] = useState('');
+
+  // 마이페이지에서 뒤로 가면 거쳐 온 화면이 아니라 항상 메인으로 간다
+  const goHome = useCallback(() => router.dismissTo('/'), []);
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        goHome();
+        return true;
+      });
+      return () => sub.remove();
+    }, [goHome]),
+  );
+
+  const saveHandle = () => {
+    const h = normalizeId(handleDraft);
+    if (!ID_RE.test(h)) return setHandleError(ID_RULE);
+    const err = actions.updateHandle(h);
+    if (err) return setHandleError(err);
+    setEditingHandle(false);
+    setHandleError('');
+  };
 
   const stats = useMemo(
     () => ({
       projects: state.memberships.filter((m) => m.userId === state.meId).length,
       logs: state.logs.filter((l) => l.authorId === state.meId).length,
+      totalSec: state.logs.filter((l) => l.authorId === state.meId).reduce((sum, l) => sum + l.durationSec, 0),
     }),
     [state.memberships, state.logs, state.meId],
   );
@@ -64,7 +91,7 @@ export default function MyPageScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <IconButton name="chevron-back" size={26} onPress={() => router.back()} />
+        <IconButton name="chevron-back" size={26} onPress={goHome} accessibilityLabel="메인으로" />
         <Text style={styles.headerTitle}>마이페이지</Text>
         <View style={{ width: 34 }} />
       </View>
@@ -81,14 +108,54 @@ export default function MyPageScreen() {
                   <Text style={styles.meTagText}>나</Text>
                 </View>
               </View>
-              <Text style={[monoText, { marginTop: 4 }]}>@{me.handle}</Text>
+              {editingHandle ? (
+                <View style={{ marginTop: 6 }}>
+                  <View style={styles.handleEdit}>
+                    <Text style={monoText}>@</Text>
+                    <TextInput
+                      value={handleDraft}
+                      onChangeText={(v) => {
+                        setHandleDraft(v);
+                        setHandleError('');
+                      }}
+                      autoFocus
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      style={styles.handleInput}
+                      onSubmitEditing={saveHandle}
+                      returnKeyType="done"
+                    />
+                  </View>
+                  {!!handleError && <Text style={styles.error}>{handleError}</Text>}
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+                    <Button
+                      small
+                      variant="ghost"
+                      title="취소"
+                      onPress={() => {
+                        setEditingHandle(false);
+                        setHandleDraft(me.handle);
+                        setHandleError('');
+                      }}
+                    />
+                    <Button small variant="soft" title="저장" onPress={saveHandle} />
+                  </View>
+                </View>
+              ) : (
+                <Pressable onPress={() => setEditingHandle(true)} style={styles.handleRow} hitSlop={6}>
+                  <Text style={monoText}>@{me.handle}</Text>
+                  <Ionicons name="pencil" size={12} color={colors.textMuted} />
+                </Pressable>
+              )}
             </View>
           </View>
+          <Text style={styles.hintText}>계정 ID는 친구가 나를 찾을 때 쓰여요. 로그인 아이디는 바뀌지 않아요.</Text>
 
           <View style={styles.stats}>
             <Stat label="프로젝트" value={stats.projects} />
             <Stat label="기록" value={stats.logs} />
             <Stat label="친구" value={state.friendIds.length} />
+            <Stat label="총 뜨개 시간" value={hoursMinutes(stats.totalSec)} />
           </View>
 
           <View style={styles.divider} />
@@ -128,22 +195,17 @@ export default function MyPageScreen() {
           )}
 
           <View style={styles.divider} />
-          <View style={styles.privacyRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>프로필 공개</Text>
-              <Text style={styles.rowDesc}>
-                {me.isPrivate
-                  ? '비공개: 다른 사람이 내 프로필에서 기록을 볼 수 없어요. 함께 하는 프로젝트 안에서는 보여요.'
-                  : '공개: 누구나 내 프로필에서 모든 기록을 볼 수 있어요.'}
-              </Text>
-            </View>
-            <Switch
-              value={!me.isPrivate}
-              onValueChange={(v) => actions.setPrivate(!v)}
-              trackColor={{ true: colors.primary, false: colors.borderStrong }}
-              thumbColor="#fff"
-            />
-          </View>
+          <Text style={styles.rowTitle}>프로필 공개 범위</Text>
+          <Text style={[styles.rowDesc, { marginBottom: 10 }]}>{visibilityDesc[me.visibility]}</Text>
+          <Segmented<ProfileVisibility>
+            value={me.visibility}
+            onChange={actions.setVisibility}
+            options={[
+              { value: 'public', label: '전체 공개' },
+              { value: 'friends', label: '친구 공개' },
+              { value: 'private', label: '비공개' },
+            ]}
+          />
         </View>
 
         {/* 메뉴 */}
@@ -177,7 +239,7 @@ export default function MyPageScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="닉네임 또는 핸들 검색..."
+            placeholder="계정 ID 또는 닉네임 검색..."
             placeholderTextColor={colors.textMuted}
             style={styles.searchInput}
             autoCapitalize="none"
@@ -281,6 +343,12 @@ export default function MyPageScreen() {
   );
 }
 
+const visibilityDesc: Record<ProfileVisibility, string> = {
+  public: '누구나 내 프로필에서 모든 기록을 볼 수 있어요.',
+  friends: '친구만 내 프로필에서 기록을 볼 수 있어요.',
+  private: '다른 사람은 내 프로필에서 기록을 볼 수 없어요.',
+};
+
 function MenuRow({
   icon,
   label,
@@ -307,7 +375,7 @@ function MenuRow({
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
       <Text style={styles.statNum}>{value}</Text>
@@ -341,7 +409,18 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 6 },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   container: { paddingHorizontal: 20, paddingTop: 10 },
-  privacyRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  handleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  handleEdit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+  },
+  handleInput: { flex: 1, paddingVertical: 8, fontFamily: fonts.mono, fontSize: 14, color: colors.text },
+  error: { fontSize: 12, color: colors.danger, marginTop: 4 },
+  hintText: { fontSize: 11, color: colors.textMuted, marginTop: 10 },
   rowTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
   rowDesc: { fontSize: 12, lineHeight: 17, color: colors.textSub, marginTop: 3 },
   menuRow: {

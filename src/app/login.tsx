@@ -27,13 +27,13 @@ export default function LoginScreen() {
   return (
     <AuthLayout subtitle="나의 뜨개 기록">
       <AuthField
-        label="아이디"
+        label="로그인 아이디"
         value={username}
         onChangeText={(v) => {
           setUsername(v);
           setError('');
         }}
-        placeholder="아이디"
+        placeholder="로그인 아이디"
         returnKeyType="next"
       />
       <AuthField
@@ -61,7 +61,7 @@ export default function LoginScreen() {
       <View style={styles.demo}>
         <Text style={styles.demoTitle}>데모 계정으로 둘러보기</Text>
         <Text style={styles.demoText}>
-          seeun_knits · sungyu_kr · jiyeon_wool{'\n'}비밀번호 {DEMO_PASSWORD}
+          seeun · sungyu · jiyeon{'\n'}비밀번호 {DEMO_PASSWORD}
         </Text>
       </View>
     </AuthLayout>

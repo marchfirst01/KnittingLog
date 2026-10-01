@@ -4,12 +4,11 @@ import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Counters } from '../../components/Counters';
 import { EditorMode, LogEditor } from '../../components/LogEditor';
 import { LogItem } from '../../components/LogItem';
 import { OwnerTag } from '../../components/ProjectCard';
 import { EditProjectSheet, InviteSheet, StatusSheet, TransferSheet } from '../../components/ProjectSheets';
-import { TimerCard } from '../../components/TimerCard';
+import { WorkBar } from '../../components/WorkBar';
 import { ActionMenu, Avatar, Button, EmptyState, IconButton, MenuItem, StatusBadge, monoText } from '../../components/ui';
 import { LogInput, membersOf, useStore } from '../../store/AppStore';
 import { colors, fonts } from '../../theme';
@@ -31,6 +30,7 @@ export default function ProjectDetailScreen() {
   const [viewId, setViewId] = useState(state.meId);
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [sheet, setSheet] = useState<SheetName>(null);
+  const [barHeight, setBarHeight] = useState(0);
 
   if (!project || !me) {
     return (
@@ -54,6 +54,7 @@ export default function ProjectDetailScreen() {
         .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   const totalSec = logs.reduce((s, l) => s + l.durationSec, 0);
   const ended = viewing.status === 'done';
+  const showBar = viewingMe && !ended;
 
   // ── 프로젝트 메뉴 ──
   const leave = () => {
@@ -104,7 +105,8 @@ export default function ProjectDetailScreen() {
 
   const menuItems: MenuItem[] = [
     { label: '수정', icon: 'create-outline', onPress: () => setSheet('edit') },
-    { label: '친구 초대', icon: 'person-add-outline', onPress: () => setSheet('invite') },
+    // 친구 초대는 방장만
+    ...(isOwner ? [{ label: '친구 초대', icon: 'person-add-outline' as const, onPress: () => setSheet('invite') }] : []),
     ...(isOwner && others.length > 0
       ? [{ label: '방장 양도', icon: 'swap-horizontal-outline' as const, onPress: () => setSheet('transfer') }]
       : []),
@@ -169,7 +171,7 @@ export default function ProjectDetailScreen() {
         />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingBottom: (showBar ? barHeight : insets.bottom) + 40 }} keyboardShouldPersistTaps="handled">
         {/* 진행 현황: 맨 위 멤버 아이콘을 눌러 각자의 기록을 본다 */}
         <View style={[styles.progressBox, ended && styles.progressDone]}>
           {shared && (
@@ -189,10 +191,12 @@ export default function ProjectDetailScreen() {
                   </Pressable>
                 );
               })}
-              <Pressable onPress={() => setSheet('invite')} style={[styles.member, styles.memberAdd]} accessibilityLabel="친구 초대">
-                <Ionicons name="add" size={18} color={colors.primary} />
-                <Text style={[styles.memberName, { color: colors.primary }]}>초대</Text>
-              </Pressable>
+              {isOwner && (
+                <Pressable onPress={() => setSheet('invite')} style={[styles.member, styles.memberAdd]} accessibilityLabel="친구 초대">
+                  <Ionicons name="add" size={18} color={colors.primary} />
+                  <Text style={[styles.memberName, { color: colors.primary }]}>초대</Text>
+                </Pressable>
+              )}
             </ScrollView>
           )}
           <View style={styles.progressRow}>
@@ -224,13 +228,8 @@ export default function ProjectDetailScreen() {
               </View>
             ) : (
               <View style={{ gap: 10, marginBottom: 24 }}>
-                <TimerCard
-                  projectId={project.id}
-                  onFinish={(startedAt, durationSec) => setEditor({ kind: 'timer', startedAt, durationSec })}
-                />
-                <Counters projectId={project.id} counters={me.counters} />
                 <Button title="기록 직접 추가" icon="create-outline" variant="soft" onPress={() => setEditor({ kind: 'manual' })} />
-                {!shared && (
+                {!shared && isOwner && (
                   <Pressable onPress={() => setSheet('invite')} style={styles.shareHint}>
                     <Ionicons name="people-outline" size={16} color={colors.primary} />
                     <Text style={styles.shareHintText}>친구를 초대하면 서로의 기록을 함께 볼 수 있어요</Text>
@@ -285,6 +284,16 @@ export default function ProjectDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* 하단 고정 작업바: 타이머 + 단수 카운터 (내 기록을 볼 때만) */}
+      {showBar && (
+        <WorkBar
+          projectId={project.id}
+          counters={me.counters}
+          onHeight={setBarHeight}
+          onFinish={(startedAt, durationSec) => setEditor({ kind: 'timer', startedAt, durationSec })}
+        />
+      )}
 
       {editor && (
         <LogEditor

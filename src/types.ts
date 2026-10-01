@@ -1,19 +1,22 @@
 /** 개인별 프로젝트 상태: 진행중 / 보관(잠시 중단) / 종료(본인 기록 종료) */
 export type MemberStatus = 'active' | 'paused' | 'done';
 
+/** 프로필 공개 범위: 전체 공개 / 친구 공개 / 비공개 (함께 하는 프로젝트 안에서는 항상 보임) */
+export type ProfileVisibility = 'public' | 'friends' | 'private';
+
 export interface User {
   id: string;
   name: string;
+  /** 계정 ID (@handle) — 친구 찾기·표시에 쓰고, 바꿀 수 있다 */
   handle: string;
   bio: string;
   color: string;
-  /** 비공개 프로필이면 프로필 페이지에서 기록을 볼 수 없다 (공유 중인 프로젝트 안에서는 보임) */
-  isPrivate: boolean;
+  visibility: ProfileVisibility;
 }
 
 export interface Account {
   userId: string;
-  /** 로그인 아이디 (= handle) */
+  /** 로그인 아이디 — 가입 후 변경 불가, 다른 사람에게 보이지 않는다 */
   username: string;
   passwordHash: string;
 }
@@ -28,9 +31,15 @@ export interface Project {
 }
 
 export interface Counter {
+  id: string;
   label: string;
   value: number;
+  /** 목표 단수 */
   max: number;
+  /** 작업바에 표시 */
+  visible: boolean;
+  /** 마지막으로 값이 바뀐 시각 (ISO) */
+  updatedAt: string;
 }
 
 /** 프로젝트에 대한 한 사람의 참여 정보 (개인 소유) */
@@ -44,7 +53,7 @@ export interface Membership {
   endedAt?: string;
   yarn: string;
   needle: string;
-  counters: [Counter, Counter];
+  counters: Counter[];
   joinedAt: string;
 }
 

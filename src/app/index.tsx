@@ -40,9 +40,10 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }]}>
-        <View style={styles.header}>
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      {/* 두 번째 자식(내 프로젝트/피드 탭)은 스크롤해도 상단에 고정된다 */}
+      <ScrollView stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+        <View style={[styles.header, styles.container, { paddingTop: 20 }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>뜨개로그</Text>
             <Text style={styles.subtitle}>나의 뜨개 기록</Text>
@@ -64,14 +65,18 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <Segmented<Tab>
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'projects', label: '내 프로젝트', badge: state.incomingInvites.length },
-            { value: 'feed', label: '피드' },
-          ]}
-        />
+        <View style={[styles.container, styles.sticky]}>
+          <Segmented<Tab>
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'projects', label: '내 프로젝트', badge: state.incomingInvites.length },
+              { value: 'feed', label: '피드' },
+            ]}
+          />
+        </View>
+
+        <View style={styles.container}>
 
         {tab === 'projects' ? (
           <>
@@ -124,6 +129,7 @@ export default function HomeScreen() {
             )}
           </View>
         )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -131,7 +137,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  sticky: { backgroundColor: colors.bg, paddingVertical: 8 },
   title: { fontSize: 30, fontWeight: '700', color: colors.text, fontFamily: fonts.serif },
   subtitle: { fontSize: 13, color: colors.textSub, fontFamily: fonts.mono, marginTop: 6, letterSpacing: 1 },
   dot: {
@@ -149,7 +156,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dotText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  chipsWrap: { marginTop: 20, marginBottom: 18, marginHorizontal: -20 },
+  chipsWrap: { marginTop: 12, marginBottom: 18, marginHorizontal: -20 },
   chips: { gap: 8, paddingHorizontal: 20 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: 10 },
   sectionCount: { color: colors.primary },

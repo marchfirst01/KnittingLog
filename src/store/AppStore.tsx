@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
-import { createInitialState, defaultCounters } from '../data/mock';
+import { createInitialState, defaultCounters, makeCounter } from '../data/mock';
 import {
   AppState,
   Counter,
@@ -10,6 +10,7 @@ import {
   Membership,
   MemberStatus,
   Post,
+  ProfileVisibility,
   Project,
   RawState,
   ReportReason,
@@ -18,7 +19,7 @@ import {
 } from '../types';
 import { uid } from '../utils/format';
 
-const STORAGE_KEY = 'knittinglog/state/v3';
+const STORAGE_KEY = 'knittinglog/state/v4';
 
 export type NewProjectInput = Pick<Project, 'title' | 'coverUri'> &
   Pick<Membership, 'yarn' | 'needle' | 'status'> & {
@@ -39,7 +40,10 @@ type Action =
   | { type: 'updateProject'; projectId: string; patch: Partial<Pick<Project, 'title' | 'coverUri'>> }
   | { type: 'updateMembership'; projectId: string; patch: Partial<Pick<Membership, 'yarn' | 'needle'>> }
   | { type: 'setMyStatus'; projectId: string; status: MemberStatus }
-  | { type: 'setCounter'; projectId: string; index: 0 | 1; patch: Partial<Counter> }
+  | { type: 'setCounter'; projectId: string; counterId: string; patch: Partial<Omit<Counter, 'id'>> }
+  | { type: 'addCounter'; projectId: string; counter: Counter }
+  | { type: 'deleteCounter'; projectId: string; counterId: string }
+  | { type: 'moveCounter'; projectId: string; counterId: string; dir: -1 | 1 }
   | { type: 'deleteProject'; projectId: string }
   | { type: 'transferOwner'; projectId: string; userId: string }
   | { type: 'removeMember'; projectId: string; userId: string; newProjectId: string }
@@ -62,7 +66,8 @@ type Action =
   | { type: 'addPostComment'; postId: string; text: string }
   | { type: 'deletePostComment'; postId: string; commentId: string }
   | { type: 'updateBio'; bio: string }
-  | { type: 'setPrivate'; isPrivate: boolean }
+  | { type: 'setVisibility'; visibility: ProfileVisibility }
+  | { type: 'updateHandle'; handle: string }
   | { type: 'report'; targetUserId: string; targetPostId?: string; reason: ReportReason; detail: string }
   | { type: 'block'; userId: string }
   | { type: 'unblock'; userId: string }
@@ -183,12 +188,31 @@ function reducer(state: RawState, action: Action): RawState {
         endedAt: action.status === 'done' ? (m.status === 'done' ? m.endedAt : now()) : undefined,
       }));
     case 'setCounter':
+      return mapMembership(state, action.projectId, me, (m) => ({
+        ...m,
+        counters: m.counters.map((c) => {
+          if (c.id !== action.counterId) return c;
+          const next = { ...c, ...action.patch };
+          next.value = Math.max(0, next.value);
+          next.max = Math.max(1, next.max);
+          if (next.value !== c.value) next.updatedAt = now();
+          return next;
+        }),
+      }));
+    case 'addCounter':
+      return mapMembership(state, action.projectId, me, (m) => ({ ...m, counters: [...m.counters, action.counter] }));
+    case 'deleteCounter':
+      return mapMembership(state, action.projectId, me, (m) => ({
+        ...m,
+        counters: m.counters.filter((c) => c.id !== action.counterId),
+      }));
+    case 'moveCounter':
       return mapMembership(state, action.projectId, me, (m) => {
-        const counters = [...m.counters] as [Counter, Counter];
-        const c = { ...counters[action.index], ...action.patch };
-        c.value = Math.max(0, c.value);
-        c.max = Math.max(1, c.max);
-        counters[action.index] = c;
+        const i = m.counters.findIndex((c) => c.id === action.counterId);
+        const j = i + action.dir;
+        if (i < 0 || j < 0 || j >= m.counters.length) return m;
+        const counters = [...m.counters];
+        [counters[i], counters[j]] = [counters[j], counters[i]];
         return { ...m, counters };
       });
     case 'deleteProject': {
@@ -220,7 +244,9 @@ function reducer(state: RawState, action: Action): RawState {
       return detachMember(state, action.projectId, action.userId, action.newProjectId);
 
     case 'invite':
+      // 친구 초대는 방장만 할 수 있다
       if (
+        !isOwner ||
         isBlockedBetween(state, me, action.userId) ||
         state.invites.some((i) => i.projectId === action.projectId && i.to === action.userId)
       )
@@ -335,8 +361,11 @@ function reducer(state: RawState, action: Action): RawState {
     // ── 프로필 · 신고 · 차단 ──
     case 'updateBio':
       return { ...state, users: { ...state.users, [me]: { ...state.users[me], bio: action.bio } } };
-    case 'setPrivate':
-      return { ...state, users: { ...state.users, [me]: { ...state.users[me], isPrivate: action.isPrivate } } };
+    case 'setVisibility':
+      return { ...state, users: { ...state.users, [me]: { ...state.users[me], visibility: action.visibility } } };
+    case 'updateHandle':
+      if (Object.values(state.users).some((u) => u.id !== me && u.handle === action.handle)) return state;
+      return { ...state, users: { ...state.users, [me]: { ...state.users[me], handle: action.handle } } };
     case 'report':
       return {
         ...state,
@@ -424,16 +453,17 @@ function createActions(dispatch: React.Dispatch<Action>, s: RawState) {
     reset: () => dispatch({ type: 'reset' }),
 
     /** 성공하면 null, 실패하면 에러 메시지 */
-    signup: async (username: string, password: string, name: string): Promise<string | null> => {
+    signup: async (username: string, handle: string, password: string, name: string): Promise<string | null> => {
       if (s.accounts.some((a) => a.username === username)) return '이미 사용 중인 아이디예요.';
+      if (Object.values(s.users).some((u) => u.handle === handle)) return '이미 사용 중인 계정 ID예요.';
       const passwordHash = await hashPassword(username, password);
       const user: User = {
         id: uid(),
         name,
-        handle: username,
+        handle,
         bio: '',
         color: USER_COLORS[Object.keys(s.users).length % USER_COLORS.length],
-        isPrivate: false,
+        visibility: 'public',
       };
       dispatch({ type: 'signup', user, username, passwordHash });
       return null;
@@ -470,8 +500,18 @@ function createActions(dispatch: React.Dispatch<Action>, s: RawState) {
     updateMembership: (projectId: string, patch: Partial<Pick<Membership, 'yarn' | 'needle'>>) =>
       dispatch({ type: 'updateMembership', projectId, patch }),
     setMyStatus: (projectId: string, status: MemberStatus) => dispatch({ type: 'setMyStatus', projectId, status }),
-    setCounter: (projectId: string, index: 0 | 1, patch: Partial<Counter>) =>
-      dispatch({ type: 'setCounter', projectId, index, patch }),
+    setCounter: (projectId: string, counterId: string, patch: Partial<Omit<Counter, 'id'>>) =>
+      dispatch({ type: 'setCounter', projectId, counterId, patch }),
+    /** 새 카운터를 만들고 id를 돌려준다 */
+    addCounter: (projectId: string) => {
+      const count = s.memberships.find((m) => m.projectId === projectId && m.userId === me)?.counters.length ?? 0;
+      const counter = makeCounter(`단수 카운터 ${count + 1}`, 30);
+      dispatch({ type: 'addCounter', projectId, counter });
+      return counter.id;
+    },
+    deleteCounter: (projectId: string, counterId: string) => dispatch({ type: 'deleteCounter', projectId, counterId }),
+    moveCounter: (projectId: string, counterId: string, dir: -1 | 1) =>
+      dispatch({ type: 'moveCounter', projectId, counterId, dir }),
     deleteProject: (projectId: string) => dispatch({ type: 'deleteProject', projectId }),
     transferOwner: (projectId: string, userId: string) => dispatch({ type: 'transferOwner', projectId, userId }),
     /** 나가기. 내 기록이 옮겨진 새 개인 프로젝트 id를 돌려준다 */
@@ -518,7 +558,13 @@ function createActions(dispatch: React.Dispatch<Action>, s: RawState) {
     deletePostComment: (postId: string, commentId: string) => dispatch({ type: 'deletePostComment', postId, commentId }),
 
     updateBio: (bio: string) => dispatch({ type: 'updateBio', bio }),
-    setPrivate: (isPrivate: boolean) => dispatch({ type: 'setPrivate', isPrivate }),
+    setVisibility: (visibility: ProfileVisibility) => dispatch({ type: 'setVisibility', visibility }),
+    /** 계정 ID 변경. 성공하면 null, 실패하면 에러 메시지 */
+    updateHandle: (handle: string): string | null => {
+      if (Object.values(s.users).some((u) => u.id !== me && u.handle === handle)) return '이미 사용 중인 계정 ID예요.';
+      dispatch({ type: 'updateHandle', handle });
+      return null;
+    },
     report: (targetUserId: string, reason: ReportReason, detail: string, targetPostId?: string) =>
       dispatch({ type: 'report', targetUserId, targetPostId, reason, detail }),
     block: (userId: string) => dispatch({ type: 'block', userId }),
@@ -568,3 +614,13 @@ export function useStore() {
   if (!ctx) throw new Error('useStore must be used inside AppStoreProvider');
   return ctx;
 }
+
+/** 프로필에서 그 사람의 기록을 볼 수 있는지: 본인·전체 공개·친구 공개(친구일 때) */
+export function canViewProfileLogs(state: AppState, userId: string) {
+  const user = state.users[userId];
+  if (!user || state.hiddenIds.includes(userId)) return false;
+  if (userId === state.meId || user.visibility === 'public') return true;
+  return user.visibility === 'friends' && state.friendIds.includes(userId);
+}
+
+export const visibilityLabels = { public: '전체 공개', friends: '친구 공개', private: '비공개' } as const;
